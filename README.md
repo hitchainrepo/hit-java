@@ -1,4 +1,4 @@
-Java Git
+Hit-Java
 ========
 
 An implementation of the Git version control system in pure Java.
