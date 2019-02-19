@@ -917,6 +917,7 @@
   </profiles>
 
   <modules>
+    <module>org.hitchain.core</module>
     <module>org.eclipse.jgit</module>
     <module>org.eclipse.jgit.ant</module>
     <module>org.eclipse.jgit.archive</module>
