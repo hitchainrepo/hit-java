@@ -10,6 +10,7 @@ package org.hitchain.hit.util;
 
 import io.ipfs.api.IPFS;
 import io.ipfs.api.MerkleNode;
+import io.ipfs.api.NamedStreamable;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -25,6 +26,7 @@ import java.io.*;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * GitHelper
@@ -91,8 +93,73 @@ public class GitHelper {
             System.out.println("ADD:" + entry.getKey());
         }
         //#6.Gen the new GitFileIndex.
+        Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> newGitFileIndex = generateNewGitFileIndex(current,
+                oldGitFileIndex, newGitFileIndexToIpfs);
+        for (Entry<String, Two<Object, String, String>> entry : newGitFileIndex.entrySet()) {
+            System.out.println("NEW:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:"
+                    + entry.getValue().second());
+        }
         //#7.Write the new GitFileIndex to disk and ipfs.
+        String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, newGitFileIndex);
+        System.out.println("Project name0: " + projectDir.getPath() + ", gitFileHash: " + URL_IPFS + ":8080/ipfs/"
+                + gitFileIndexHash);
         //#8.Call contract and update project hash(GitFileIndex hash).
+        updateProjectAddress(projectInfoFile, gitFileIndexHash);
+    }
+
+    private static void updateProjectAddress(ProjectInfoFile projectInfoFile, String newProjectAddress) {
+        EthereumHelper.updateProjectAddress(URL_ETHER, projectInfoFile.getRepoAddress(),
+                EthereumHelper.encryptPriKeyEcc(URL_ETHER, rootPriKeyEcc), newProjectAddress);
+    }
+
+    private static String writeGitFileIndexToIpfs(File projectDir, Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileHash) {
+        IPFS ipfs = getIpfs();
+        try {
+            byte[] gitFileIndexWithCompress = toGitFileIndexWithCompress(gitFileHash);
+            File gitFileIndex = new File(projectDir, "objects/pack/gitfile.idx");
+            writeUpdateFile(gitFileIndex, gitFileIndexWithCompress);
+            NamedStreamable.ByteArrayWrapper file = new NamedStreamable.ByteArrayWrapper("gitfile.idx",
+                    gitFileIndexWithCompress);
+            List<MerkleNode> add = ipfs.add(file);
+            return add.get(add.size() - 1).hash.toBase58();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static byte[] toGitFileIndexWithCompress(Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileIndex) {
+        StringBuilder sb = new StringBuilder();
+        for (Entry<String, Two<Object, String, String>> entry : gitFileIndex.entrySet()) {
+            sb.append(entry.getValue().first()).append(',').append(entry.getValue().second()).append(',')
+                    .append(entry.getKey()).append('\n');
+        }
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            GZIPOutputStream gzip = new GZIPOutputStream(out);
+            gzip.write(sb.toString().getBytes("UTF-8"));
+            gzip.close();
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> generateNewGitFileIndex(
+            Map<String/* relativePath */, File> current,
+            Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> oldGitFileIndex,
+            Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> newGitFileIndex) {
+        Map<String, Two<Object, String, String>> map = new LinkedHashMap();
+        for (Entry<String, File> entry : current.entrySet()) {
+            String key = entry.getKey();
+            Two<Object, String, String> twoNew = newGitFileIndex.get(key);
+            Two<Object, String, String> twoOld = oldGitFileIndex.get(key);
+            String ipfsHash = StringUtils.defaultString(twoNew == null ? null : twoNew.first(),
+                    twoOld == null ? null : twoOld.first());
+            String sha1 = StringUtils.defaultString(twoNew == null ? null : twoNew.second(),
+                    twoOld == null ? null : twoOld.second());
+            map.put(key, new Two(ipfsHash, sha1));
+        }
+        return map;
     }
 
     private static IPFS getIpfs() {
