@@ -9,15 +9,17 @@
 package org.hitchain.hit.util;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.bouncycastle.util.encoders.Hex;
 import org.eclipse.jgit.internal.storage.file.LockFile;
 import org.hitchain.hit.api.HashedFile;
 import org.hitchain.hit.api.ProjectInfoFile;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 /**
  * GitHelper
@@ -64,6 +66,12 @@ public class GitHelper {
      */
     public static void onPush(File projectDir) {
         //#1.Get or create ProjectInfoFile.
+        ProjectInfoFile projectInfoFile = readProjectInfoFile(projectDir);
+        Map<String, Tuple.Two<Object, String/* ipfs hash */, String/* sha1 */>> oldGitFileIndex = readGitFileIndexFromIpfs(
+                projectDir);
+        for (Map.Entry<String, Tuple.Two<Object, String, String>> entry : oldGitFileIndex.entrySet()) {
+            System.out.println("OLD:" + entry.getKey());
+        }
         //#2.Get GitFileIndex from ProjectInfoFile contract address.
         //#3.List all current files.
         //#4.Compare current files and GitFileIndex and get the changed files.
@@ -71,6 +79,47 @@ public class GitHelper {
         //#6.Gen the new GitFileIndex.
         //#7.Write the new GitFileIndex to disk and ipfs.
         //#8.Call contract and update project hash(GitFileIndex hash).
+    }
+
+    private static Map<String/* filename */, Tuple.Two<Object, String/* ipfs hash */, String/* sha1 */>> readGitFileIndexFromIpfs(
+            File projectDir) {
+        try {
+            File gitFileIndex = new File(projectDir, "objects/pack/gitfile.idx");
+            if (!gitFileIndex.exists()) {
+                return parseGitFilesIndex(null);
+            }
+            byte[] contentWithCompress = FileUtils.readFileToByteArray(gitFileIndex);
+            return parseGitFilesIndex(contentWithCompress);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static Map<String/* filename */, Tuple.Two<Object, String/* ipfs hash */, String/* sha1 */>> parseGitFilesIndex(
+            byte[] contentWithCompress) {
+        Map<String, Tuple.Two<Object, String, String>> map = new LinkedHashMap<>();
+        if (contentWithCompress == null || contentWithCompress.length == 0) {
+            return map;
+        }
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ByteArrayInputStream in = new ByteArrayInputStream(contentWithCompress);
+            GZIPInputStream ungzip = new GZIPInputStream(in);
+            IOUtils.copy(ungzip, out);
+            ungzip.close();
+            String index = new String(out.toByteArray(), "UTF-8");
+            String[] lines = StringUtils.split(index, '\n');
+            for (String line : lines) {
+                String[] nameIpfsSha = StringUtils.split(line, ',');
+                if (nameIpfsSha.length != 3) {
+                    continue;
+                }
+                map.put(nameIpfsSha[2], new Tuple.Two<>(nameIpfsSha[0], nameIpfsSha[1]));
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return map;
     }
 
     private static ProjectInfoFile readProjectInfoFile(File projectDir) {
