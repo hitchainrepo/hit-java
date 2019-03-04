@@ -162,13 +162,13 @@ public class TransportHit extends HttpTransport implements WalkTransport {
 
     protected TransportHit(Repository local, URIish uri) throws NotSupportedException {
         super(local, uri);
-        Properties props = loadProperties();
-        File directory = local.getDirectory();
-        if (!props.containsKey("tmpdir") && directory != null) {
-            props.put("tmpdir", directory.getPath());
-        }
+        //Properties props = loadProperties();
+        File projectDir = local.getDirectory();
+        //if (!props.containsKey("tmpdir") && directory != null) {
+        //    props.put("tmpdir", directory.getPath());
+        //}
 
-        hit = new HitIPFSStorage(props);
+        hit = new HitIPFSStorage(projectDir);
         //bucket = uri.getHost();
 
         String p = uri.getPath();
@@ -181,44 +181,44 @@ public class TransportHit extends HttpTransport implements WalkTransport {
         keyPrefix = p;
     }
 
-    private static Properties loadPropertiesFile(File propsFile) throws NotSupportedException {
-        try {
-            return AmazonS3.properties(propsFile);
-        } catch (IOException e) {
-            throw new NotSupportedException(MessageFormat.format(JGitText.get().cannotReadFile, propsFile), e);
-        }
-    }
+//    private static Properties loadPropertiesFile(File propsFile) throws NotSupportedException {
+//        try {
+//            return AmazonS3.properties(propsFile);
+//        } catch (IOException e) {
+//            throw new NotSupportedException(MessageFormat.format(JGitText.get().cannotReadFile, propsFile), e);
+//        }
+//    }
 
-    private Properties loadProperties() throws NotSupportedException {
-        if (local.getDirectory() != null) {
-            File propsFile = new File(local.getDirectory(), uri.getUser());
-            if (propsFile.isFile()) {
-                return loadPropertiesFile(propsFile);
-            }
-        }
-
-        File propsFile = new File(local.getFS().userHome(), uri.getUser());
-        if (propsFile.isFile()) {
-            return loadPropertiesFile(propsFile);
-        }
-
-        Properties props = new Properties();
-        String user = uri.getUser();
-        String pass = uri.getPass();
-        if (user != null && pass != null) {
-            props.setProperty("accesskey", user);
-            props.setProperty("secretkey", pass);
-        } else {
-            throw new NotSupportedException(MessageFormat.format(JGitText.get().cannotReadFile, propsFile));
-        }
-        return props;
-    }
+//    private Properties loadProperties() throws NotSupportedException {
+//        if (local.getDirectory() != null) {
+//            File propsFile = new File(local.getDirectory(), uri.getUser());
+//            if (propsFile.isFile()) {
+//                return loadPropertiesFile(propsFile);
+//            }
+//        }
+//
+//        File propsFile = new File(local.getFS().userHome(), uri.getUser());
+//        if (propsFile.isFile()) {
+//            return loadPropertiesFile(propsFile);
+//        }
+//
+//        Properties props = new Properties();
+//        String user = uri.getUser();
+//        String pass = uri.getPass();
+//        if (user != null && pass != null) {
+//            props.setProperty("accesskey", user);
+//            props.setProperty("secretkey", pass);
+//        } else {
+//            throw new NotSupportedException(MessageFormat.format(JGitText.get().cannotReadFile, propsFile));
+//        }
+//        return props;
+//    }
 
     /**
      * {@inheritDoc}
      */
     public FetchConnection openFetch() throws TransportException {
-        HitIPFSDatabase c = new HitIPFSDatabase(/*bucket,*/ keyPrefix + "/objects");
+        HitIPFSDatabase c = new HitIPFSDatabase(hit, keyPrefix + "/objects");
         WalkFetchConnection r = new WalkFetchConnection(this, c);
         r.available(c.readAdvertisedRefs());
         return r;
@@ -228,7 +228,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
      * {@inheritDoc}
      */
     public PushConnection openPush() throws TransportException {
-        HitIPFSDatabase c = new HitIPFSDatabase(keyPrefix + "/objects");
+        HitIPFSDatabase c = new HitIPFSDatabase(hit,keyPrefix + "/objects");
         WalkPushConnection r = new WalkPushConnection(this, c);
         r.available(c.readAdvertisedRefs());
         return r;

@@ -11,6 +11,7 @@ package org.hitchain.hit.util;
 import io.ipfs.api.IPFS;
 import io.ipfs.api.MerkleNode;
 import io.ipfs.api.NamedStreamable;
+import io.ipfs.multihash.Multihash;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -76,7 +77,7 @@ public class GitHelper {
         //#1.Get or create ProjectInfoFile.
         ProjectInfoFile projectInfoFile = readProjectInfoFile(projectDir);
         //#2.Get GitFileIndex from ProjectInfoFile contract address.
-        Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> oldGitFileIndex = readGitFileIndexFromIpfs(projectDir);
+        Map<String/*fileName*/, Two<Object, String/* ipfs hash */, String/* sha1 */>> oldGitFileIndex = readGitFileIndexFromLocal(projectDir);
         for (Entry<String, Two<Object, String, String>> entry : oldGitFileIndex.entrySet()) {
             System.out.println("OLD:" + entry.getKey());
         }
@@ -93,23 +94,19 @@ public class GitHelper {
             System.out.println("ADD:" + entry.getKey());
         }
         //#6.Gen the new GitFileIndex.
-        Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> newGitFileIndex = generateNewGitFileIndex(current,
-                oldGitFileIndex, newGitFileIndexToIpfs);
+        Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> newGitFileIndex = generateNewGitFileIndex(current, oldGitFileIndex, newGitFileIndexToIpfs);
         for (Entry<String, Two<Object, String, String>> entry : newGitFileIndex.entrySet()) {
-            System.out.println("NEW:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:"
-                    + entry.getValue().second());
+            System.out.println("NEW:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:" + entry.getValue().second());
         }
         //#7.Write the new GitFileIndex to disk and ipfs.
         String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, newGitFileIndex);
-        System.out.println("Project name0: " + projectDir.getPath() + ", gitFileHash: " + URL_IPFS + ":8080/ipfs/"
-                + gitFileIndexHash);
+        System.out.println("Project name0: " + projectDir.getPath() + ", gitFileHash: " + URL_IPFS + ":8080/ipfs/" + gitFileIndexHash);
         //#8.Call contract and update project hash(GitFileIndex hash).
         updateProjectAddress(projectInfoFile, gitFileIndexHash);
     }
 
     private static void updateProjectAddress(ProjectInfoFile projectInfoFile, String newProjectAddress) {
-        EthereumHelper.updateProjectAddress(URL_ETHER, projectInfoFile.getRepoAddress(),
-                EthereumHelper.encryptPriKeyEcc(URL_ETHER, rootPriKeyEcc), newProjectAddress);
+        EthereumHelper.updateProjectAddress(URL_ETHER, projectInfoFile.getRepoAddress(), EthereumHelper.encryptPriKeyEcc(URL_ETHER, rootPriKeyEcc), newProjectAddress);
     }
 
     private static String writeGitFileIndexToIpfs(File projectDir, Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileHash) {
@@ -118,8 +115,7 @@ public class GitHelper {
             byte[] gitFileIndexWithCompress = toGitFileIndexWithCompress(gitFileHash);
             File gitFileIndex = new File(projectDir, "objects/pack/gitfile.idx");
             writeUpdateFile(gitFileIndex, gitFileIndexWithCompress);
-            NamedStreamable.ByteArrayWrapper file = new NamedStreamable.ByteArrayWrapper("gitfile.idx",
-                    gitFileIndexWithCompress);
+            NamedStreamable.ByteArrayWrapper file = new NamedStreamable.ByteArrayWrapper("gitfile.idx", gitFileIndexWithCompress);
             List<MerkleNode> add = ipfs.add(file);
             return add.get(add.size() - 1).hash.toBase58();
         } catch (Exception e) {
@@ -130,8 +126,7 @@ public class GitHelper {
     private static byte[] toGitFileIndexWithCompress(Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileIndex) {
         StringBuilder sb = new StringBuilder();
         for (Entry<String, Two<Object, String, String>> entry : gitFileIndex.entrySet()) {
-            sb.append(entry.getValue().first()).append(',').append(entry.getValue().second()).append(',')
-                    .append(entry.getKey()).append('\n');
+            sb.append(entry.getValue().first()).append(',').append(entry.getValue().second()).append(',').append(entry.getKey()).append('\n');
         }
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -168,8 +163,12 @@ public class GitHelper {
         return ipfs;
     }
 
-    private static Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> writeNewFileToIpfs(
-            Map<String/* relativePath */, File> newGitFile, ProjectInfoFile projectInfoFile, IPFS ipfs) {
+    public static IPFS getIpfs(String ipfsUrl) {
+        IPFS ipfs = new IPFS(ipfsUrl, 5001, "/api/v0/", false);
+        return ipfs;
+    }
+
+    private static Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> writeNewFileToIpfs(Map<String/* relativePath */, File> newGitFile, ProjectInfoFile projectInfoFile, IPFS ipfs) {
         Map<String, Two<Object, String, String>> map = new HashMap();
         Map<String, Two<Object, String, String>> hashMap = new HashMap();
         for (Entry<String, File> entry : newGitFile.entrySet()) {
@@ -206,6 +205,10 @@ public class GitHelper {
         }
     }
 
+    public static String sha1(byte[] data) {
+        return Hex.toHexString(DigestUtils.sha1(data));
+    }
+
     private static Two<Object, Map<String, File>/*add*/, Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>>/*remove*/> diffGitFiles(
             Map<String/* relativePath */, File> current,
             Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileIndex) {
@@ -235,13 +238,10 @@ public class GitHelper {
     }
 
     /**
-     * <pre>
-     * Git File Index:
-     * filehash,path/path2/filename
-     * </pre>
+     * list git files.
      *
      * @param projectDir
-     * @return
+     * @return {relativePath/fileName: File}
      */
     private static Map<String/* relativePath */, File> listGitFiles(File projectDir) {
         String basePath = projectDir.getAbsolutePath();
@@ -255,8 +255,7 @@ public class GitHelper {
         return map;
     }
 
-    private static Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> readGitFileIndexFromIpfs(
-            File projectDir) {
+    private static Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> readGitFileIndexFromLocal(File projectDir) {
         try {
             File gitFileIndex = new File(projectDir, "objects/pack/gitfile.idx");
             if (!gitFileIndex.exists()) {
@@ -269,8 +268,16 @@ public class GitHelper {
         }
     }
 
-    private static Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> parseGitFilesIndex(
-            byte[] contentWithCompress) {
+    public static Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> readGitFileIndexFromIpfs(IPFS ipfs, String gitFileIndexHash) {
+        try {
+            byte[] contentWithCompress = ipfs.cat(Multihash.fromBase58(gitFileIndexHash));//objects/pack/gitfile.idx from ipfs.
+            return parseGitFilesIndex(contentWithCompress);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> parseGitFilesIndex(byte[] contentWithCompress) {
         Map<String, Two<Object, String, String>> map = new LinkedHashMap<>();
         if (contentWithCompress == null || contentWithCompress.length == 0) {
             return map;
@@ -296,7 +303,7 @@ public class GitHelper {
         return map;
     }
 
-    private static ProjectInfoFile readProjectInfoFile(File projectDir) {
+    public static ProjectInfoFile readProjectInfoFile(File projectDir) {
         try {
             File file = new File(projectDir, "objects/info/projectinfo");
             if (!file.exists()) {
@@ -309,10 +316,8 @@ public class GitHelper {
                     info.setRepoName(getProjectName(projectDir));
                     ECKey repoKeyPair = new ECKey();
                     info.setRepoPubKey(Hex.toHexString(repoKeyPair.getPubKey()));
-                    info.setRepoPriKey(Hex.toHexString(RSAHelper.encrypt(repoKeyPair.getPrivKeyBytes(),
-                            RSAHelper.getPublicKeyFromHex(rootPubKeyRsa))));
-                    String address = EthereumHelper.createContractForProject(URL_ETHER, rootPubKeyEcc,
-                            info.getRepoName());
+                    info.setRepoPriKey(Hex.toHexString(RSAHelper.encrypt(repoKeyPair.getPrivKeyBytes(), RSAHelper.getPublicKeyFromHex(rootPubKeyRsa))));
+                    String address = EthereumHelper.createContractForProject(URL_ETHER, rootPubKeyEcc, info.getRepoName());
                     if (address == null) {
                         throw new RuntimeException("Can't not create contract for project!");
                     }
