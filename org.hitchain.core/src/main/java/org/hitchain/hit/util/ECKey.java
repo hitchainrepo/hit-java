@@ -56,7 +56,6 @@ import org.hitchain.hit.util.cryptohash.Keccak256;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
@@ -143,7 +142,7 @@ public class ECKey implements Serializable {
         pub = CURVE.getCurve().decodePoint(pubParams.getQ().getEncoded(true));
     }
 
-    public ECKey(@Nullable BigInteger priv, ECPoint pub) {
+    public ECKey(/*@Nullable*/ BigInteger priv, ECPoint pub) {
         this.priv = priv;
         if (pub == null) {
             throw new IllegalArgumentException("Public key may not be null");
@@ -390,7 +389,7 @@ public class ECKey implements Serializable {
      * @param compressed  Whether or not the original pubkey was compressed.
      * @return An ECKey containing only the public part, or null if recovery wasn't possible.
      */
-    @Nullable
+    /*@Nullable*/
     public static ECKey recoverFromSignature(int recId, ECDSASignature sig, byte[] messageHash, boolean compressed) {
         check(recId >= 0, "recId must be positive");
         check(sig.r.signum() >= 0, "r must be positive");
@@ -742,7 +741,7 @@ public class ECKey implements Serializable {
      *
      * @return -
      */
-    @Nullable
+    /*@Nullable*/
     public byte[] getPrivKeyBytes() {
         return bigIntegerToBytes(priv, 32);
     }

@@ -7,8 +7,6 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.LogCommand;
 import org.eclipse.jgit.revwalk.RevCommit;
 
-import gitbucket.core.util.GitHelper;
-
 /**
  * Hit utils.
  * @author zhaochen
@@ -21,12 +19,12 @@ public class HitHelper {
 
 	public static void getGitCommit(File projectDir) {
 		try {
-			Git git = GitHelper.open(projectDir);
-			Iterator<RevCommit> it = git.log().all().call().iterator();
-			while(it.hasNext()) {
-				RevCommit next = it.next();
-				System.out.println(next.toString());
-			}
+//			Git git = GitHelper.open(projectDir);
+//			Iterator<RevCommit> it = git.log().all().call().iterator();
+//			while(it.hasNext()) {
+//				RevCommit next = it.next();
+//				System.out.println(next.toString());
+//			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

@@ -48,9 +48,9 @@ import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.lib.Ref.Storage;
+import org.hitchain.core.HitStorage;
 
 import java.io.*;
-import java.net.URLConnection;
 import java.text.MessageFormat;
 import java.util.*;
 
@@ -81,9 +81,9 @@ import java.util.*;
  */
 public class TransportHit extends HttpTransport implements WalkTransport {
     public static final TransportProtocol PROTO_HTTP = new TransportProtocol() {
-        private final String[] schemeNames = {"http", "https"}; //$NON-NLS-1$ //$NON-NLS-2$
+        private String[] schemeNames = {"http", "https"};
 
-        private final Set<String> schemeSet = Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(schemeNames)));
+        private Set<String> schemeSet = Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(schemeNames)));
 
         public String getName() {
             return JGitText.get().transportProtoHTTP;
@@ -114,10 +114,10 @@ public class TransportHit extends HttpTransport implements WalkTransport {
         //            return new TransportHit(uri);
         //        }
     };
-    static final String HIT_SCHEME = "hit"; //$NON-NLS-1$
-    static final TransportProtocol PROTO_HIT = new TransportProtocol() {
+    public static String HIT_SCHEME = "hit";
+    public static final TransportProtocol PROTO_HIT = new TransportProtocol() {
         public String getName() {
-            return "HitChain"; //$NON-NLS-1$
+            return "HitChain";
         }
 
         public Set<String> getSchemes() {
@@ -140,12 +140,12 @@ public class TransportHit extends HttpTransport implements WalkTransport {
     /**
      * User information necessary to connect to S3.
      */
-    final AmazonS3 s3;
+    HitStorage hit;
 
     /**
      * Bucket the remote repository is stored in.
      */
-    final String bucket;
+    //String bucket;
 
     /**
      * Key prefix which all objects related to the repository start with.
@@ -158,24 +158,24 @@ public class TransportHit extends HttpTransport implements WalkTransport {
      * All files within the remote repository start with
      * <code>keyPrefix + "/"</code>.
      */
-    private final String keyPrefix;
+    private String keyPrefix;
 
-    protected TransportHit(final Repository local, final URIish uri) throws NotSupportedException {
+    protected TransportHit(Repository local, URIish uri) throws NotSupportedException {
         super(local, uri);
         Properties props = loadProperties();
         File directory = local.getDirectory();
-        if (!props.containsKey("tmpdir") && directory != null) { //$NON-NLS-1$
-            props.put("tmpdir", directory.getPath()); //$NON-NLS-1$
+        if (!props.containsKey("tmpdir") && directory != null) {
+            props.put("tmpdir", directory.getPath());
         }
 
-        s3 = new AmazonS3(props);
-        bucket = uri.getHost();
+        hit = new HitStorage(props);
+        //bucket = uri.getHost();
 
         String p = uri.getPath();
-        if (p.startsWith("/")) { //$NON-NLS-1$
+        if (p.startsWith("/")) {
             p = p.substring(1);
         }
-        if (p.endsWith("/")) { //$NON-NLS-1$
+        if (p.endsWith("/")) {
             p = p.substring(0, p.length() - 1);
         }
         keyPrefix = p;
@@ -206,8 +206,8 @@ public class TransportHit extends HttpTransport implements WalkTransport {
         String user = uri.getUser();
         String pass = uri.getPass();
         if (user != null && pass != null) {
-            props.setProperty("accesskey", user); //$NON-NLS-1$
-            props.setProperty("secretkey", pass); //$NON-NLS-1$
+            props.setProperty("accesskey", user);
+            props.setProperty("secretkey", pass);
         } else {
             throw new NotSupportedException(MessageFormat.format(JGitText.get().cannotReadFile, propsFile));
         }
@@ -218,8 +218,8 @@ public class TransportHit extends HttpTransport implements WalkTransport {
      * {@inheritDoc}
      */
     public FetchConnection openFetch() throws TransportException {
-        final DatabaseHit c = new DatabaseHit(bucket, keyPrefix + "/objects"); //$NON-NLS-1$
-        final WalkFetchConnection r = new WalkFetchConnection(this, c);
+        DatabaseHit c = new DatabaseHit(/*bucket,*/ keyPrefix + "/objects");
+        WalkFetchConnection r = new WalkFetchConnection(this, c);
         r.available(c.readAdvertisedRefs());
         return r;
     }
@@ -228,8 +228,8 @@ public class TransportHit extends HttpTransport implements WalkTransport {
      * {@inheritDoc}
      */
     public PushConnection openPush() throws TransportException {
-        final DatabaseHit c = new DatabaseHit(bucket, keyPrefix + "/objects"); //$NON-NLS-1$
-        final WalkPushConnection r = new WalkPushConnection(this, c);
+        DatabaseHit c = new DatabaseHit(keyPrefix + "/objects");
+        WalkPushConnection r = new WalkPushConnection(this, c);
         r.available(c.readAdvertisedRefs());
         return r;
     }
@@ -241,17 +241,17 @@ public class TransportHit extends HttpTransport implements WalkTransport {
         // No explicit connections are maintained.
     }
 
-    class DatabaseHit extends WalkRemoteObjectDatabase {
-        private final String bucketName;
-        private final String objectsKey;
+    public class DatabaseHit extends WalkRemoteObjectDatabase {
+        //private String bucketName;
+        private String objectsKey;
 
-        DatabaseHit(final String b, final String o) {
-            bucketName = b;
+        public DatabaseHit(/*String b, */String o) {
+            /*bucketName = b;*/
             objectsKey = o;
         }
 
-        private String resolveKey(String subpath) {
-            if (subpath.endsWith("/")) { //$NON-NLS-1$
+        protected String resolveKey(String subpath) {
+            if (subpath.endsWith("/")) {
                 subpath = subpath.substring(0, subpath.length() - 1);
             }
             String k = objectsKey;
@@ -259,18 +259,16 @@ public class TransportHit extends HttpTransport implements WalkTransport {
                 k = k.substring(0, k.lastIndexOf('/'));
                 subpath = subpath.substring(3);
             }
-            return k + "/" + subpath; //$NON-NLS-1$
+            return k + "/" + subpath;
         }
-
 
         public URIish getURI() {
             URIish u = new URIish();
             u = u.setScheme(HIT_SCHEME);
-            u = u.setHost(bucketName);
-            u = u.setPath("/" + objectsKey); //$NON-NLS-1$
+            u = u.setHost("localhost");
+            u = u.setPath("/" + objectsKey);
             return u;
         }
-
 
         public Collection<WalkRemoteObjectDatabase> getAlternates() throws IOException {
             try {
@@ -282,19 +280,19 @@ public class TransportHit extends HttpTransport implements WalkTransport {
         }
 
         public WalkRemoteObjectDatabase openAlternate(String location) throws IOException {
-            return new DatabaseHit(bucketName, resolveKey(location));
+            return new DatabaseHit(resolveKey(location));
         }
 
         public Collection<String> getPackNames() throws IOException {
-            final HashSet<String> have = new HashSet<>();
-            have.addAll(s3.list(bucket, resolveKey("pack"))); //$NON-NLS-1$
+            HashSet<String> have = new HashSet<>();
+            have.addAll(hit.list(resolveKey("pack")));
 
-            final Collection<String> packs = new ArrayList<>();
+            Collection<String> packs = new ArrayList<>();
             for (String n : have) {
-                if (!n.startsWith("pack-") || !n.endsWith(".pack")) { //$NON-NLS-1$ //$NON-NLS-2$
+                if (!n.startsWith("pack-") || !n.endsWith(".pack")) {
                     continue;
                 }
-                final String in = n.substring(0, n.length() - 5) + ".idx"; //$NON-NLS-1$
+                String in = n.substring(0, n.length() - 5) + ".idx";
                 if (have.contains(in)) {
                     packs.add(n);
                 }
@@ -302,48 +300,46 @@ public class TransportHit extends HttpTransport implements WalkTransport {
             return packs;
         }
 
-
         public FileStream open(String path) throws IOException {
-            final URLConnection c = s3.get(bucket, resolveKey(path));
-            final InputStream raw = c.getInputStream();
-            final InputStream in = s3.decrypt(c);
-            final int len = c.getContentLength();
-            return new FileStream(in, raw == in ? len : -1);
+            byte[] bs = hit.get(resolveKey(path));
+            bs = bs == null ? new byte[0] : bs;
+            int len = bs.length;
+            return new FileStream(new ByteArrayInputStream(bs), len);
         }
 
 
         public void deleteFile(String path) throws IOException {
-            s3.delete(bucket, resolveKey(path));
+            hit.delete(resolveKey(path));
         }
 
-        public OutputStream writeFile(final String path, final ProgressMonitor monitor, final String monitorTask) throws IOException {
-            return s3.beginPut(bucket, resolveKey(path), monitor, monitorTask);
+        public OutputStream writeFile(String path, ProgressMonitor monitor, String monitorTask) throws IOException {
+            return hit.beginPut(resolveKey(path), monitor, monitorTask);
         }
 
         public void writeFile(String path, byte[] data) throws IOException {
-            s3.put(bucket, resolveKey(path), data);
+            hit.put(resolveKey(path), data);
         }
 
-        Map<String, Ref> readAdvertisedRefs() throws TransportException {
-            final TreeMap<String, Ref> avail = new TreeMap<>();
+        protected Map<String, Ref> readAdvertisedRefs() throws TransportException {
+            TreeMap<String, Ref> avail = new TreeMap<>();
             readPackedRefs(avail);
             readLooseRefs(avail);
             readRef(avail, Constants.HEAD);
             return avail;
         }
 
-        private void readLooseRefs(TreeMap<String, Ref> avail) throws TransportException {
+        protected void readLooseRefs(TreeMap<String, Ref> avail) throws TransportException {
             try {
-                for (final String n : s3.list(bucket, resolveKey(ROOT_DIR + "refs"))) { //$NON-NLS-1$
-                    readRef(avail, "refs/" + n); //$NON-NLS-1$
+                for (String n : hit.list(resolveKey(ROOT_DIR + "refs"))) {
+                    readRef(avail, "refs/" + n);
                 }
             } catch (IOException e) {
                 throw new TransportException(getURI(), JGitText.get().cannotListRefs, e);
             }
         }
 
-        private Ref readRef(TreeMap<String, Ref> avail, String rn) throws TransportException {
-            final String s;
+        protected Ref readRef(TreeMap<String, Ref> avail, String rn) throws TransportException {
+            String s;
             String ref = ROOT_DIR + rn;
             try {
                 try (BufferedReader br = openReader(ref)) {
@@ -359,8 +355,8 @@ public class TransportHit extends HttpTransport implements WalkTransport {
                 throw new TransportException(getURI(), MessageFormat.format(JGitText.get().transportExceptionEmptyRef, rn));
             }
 
-            if (s.startsWith("ref: ")) { //$NON-NLS-1$
-                final String target = s.substring("ref: ".length()); //$NON-NLS-1$
+            if (s.startsWith("ref: ")) {
+                String target = s.substring("ref: ".length());
                 Ref r = avail.get(target);
                 if (r == null) {
                     r = readRef(avail, target);
@@ -374,7 +370,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
             }
 
             if (ObjectId.isId(s)) {
-                final Ref r = new ObjectIdRef.Unpeeled(loose(avail.get(rn)), rn, ObjectId.fromString(s));
+                Ref r = new ObjectIdRef.Unpeeled(loose(avail.get(rn)), rn, ObjectId.fromString(s));
                 avail.put(r.getName(), r);
                 return r;
             }
@@ -382,7 +378,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
             throw new TransportException(getURI(), MessageFormat.format(JGitText.get().transportExceptionBadRef, rn, s));
         }
 
-        private Storage loose(Ref r) {
+        protected Storage loose(Ref r) {
             if (r != null && r.getStorage() == Storage.PACKED) {
                 return Storage.LOOSE_PACKED;
             }
