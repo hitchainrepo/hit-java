@@ -17,32 +17,23 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * HitStorage
+ * HitIPFSStorage
  *
  * @author <a href="mailto:iffiff1@gmail.com">Tyler Chen</a>
  * @since 2019-03-01
  * auto generate by qdp.
  */
-public class HitStorage {
-    public HitStorage(final Properties props) {
+public class HitIPFSStorage {
+    public HitIPFSStorage(final Properties props) {
 
     }
 
     /**
-     * List the names of keys available within a bucket.
-     * <p>
-     * This method is primarily meant for obtaining a "recursive directory
-     * listing" rooted under the specified bucket and prefix location.
+     * List the path content.
      *
-     * @param prefix common prefix to filter the results by. Must not be null.
-     *               Supplying the empty string will list all keys in the bucket.
-     *               Supplying a non-empty string will act as though a trailing '/'
-     *               appears in prefix, even if it does not.
-     * @return list of keys starting with <code>prefix</code>, after removing
-     * <code>prefix</code> (or <code>prefix + "/"</code>)from all
-     * of them.
-     * @throws java.io.IOException sending the request was not possible, or the response XML
-     *                             document could not be parsed properly.
+     * @param prefix
+     * @return
+     * @throws IOException
      */
     public List<String> list(String prefix) throws IOException {
         if (prefix.length() > 0 && !prefix.endsWith("/")) { //$NON-NLS-1$
