@@ -60,8 +60,8 @@ public class HitIPFSStorage {
      */
     public List<String> list(String prefix) throws IOException {
         prefix = StringUtils.defaultString(prefix);
-        prefix = StringUtils.removeStart(prefix, "/");
         prefix = StringUtils.appendIfMissing(prefix, "/", "/");
+        prefix = StringUtils.removeStart(prefix, "/");
         List<String> filePaths = new ArrayList<>();
         for (Map.Entry<String, Two<Object, String, String>> entry : gitFileIndex.entrySet()) {
             String filePath = entry.getKey();
