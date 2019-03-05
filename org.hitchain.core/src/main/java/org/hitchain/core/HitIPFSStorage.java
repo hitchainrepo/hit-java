@@ -25,6 +25,7 @@ import org.hitchain.hit.util.Tuple.Two;
 import java.io.*;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -41,6 +42,7 @@ public class HitIPFSStorage {
     private ProjectInfoFile projectInfoFile;
     private IPFS ipfs;
     private Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileIndex;
+    private Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> uploadedGitFileIndex = new HashMap<>();
 
     public HitIPFSStorage(File projectDir) {
         this.projectDir = projectDir;
@@ -109,10 +111,17 @@ public class HitIPFSStorage {
      */
     public String put(String filePath, byte[] data) {
         try {
-            ByteArrayInputStream bais = new ByteArrayInputStream(data);
-            EncryptableFileWrapper file = new EncryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(bais)), projectInfoFile);
+            ByteArrayInputStream is = new ByteArrayInputStream(data);
+            EncryptableFileWrapper file = new EncryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(is)), projectInfoFile);
             List<MerkleNode> add = ipfs.add(file);
-            return add.get(add.size() - 1).hash.toBase58();
+            String ipfsHash = add.get(add.size() - 1).hash.toBase58();
+            {// add ipfs hash to uploadedGitFileIndex.
+                if (StringUtils.isBlank(ipfsHash)) {
+                    throw new IOException("Can not upload the file: " + filePath);
+                }
+                uploadedGitFileIndex.put(filePath, new Two(ipfsHash, GitHelper.sha1(data)));
+            }
+            return ipfsHash;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -128,18 +137,36 @@ public class HitIPFSStorage {
      * @throws IOException
      */
     public OutputStream beginPut(String filePath, ProgressMonitor monitor, String monitorTask) throws IOException {
+        ByteArrayOutputStream os = new ByteArrayOutputStream() {
+            public void close() throws IOException {
+                onBeginPutClose(filePath, monitor, monitorTask, toByteArray());
+            }
+        };
+        return os;
+    }
+
+    /**
+     * return uploaded git file hash: Map<String:relativeFilePath, Two<Object, String:ipfsHash, String:sha1>>
+     *
+     * @return
+     */
+    public Map<String, Two<Object, String, String>> getUploadedGitFileIndex() {
+        return uploadedGitFileIndex;
+    }
+
+    protected String onBeginPutClose(String filePath, ProgressMonitor monitor, String monitorTask, byte[] bs) throws IOException {
         if (monitor == null) {
             monitor = NullProgressMonitor.INSTANCE;
         }
         if (monitorTask == null) {
             monitorTask = MessageFormat.format(JGitText.get().progressMonUploading, filePath);
         }
-        EncryptableFileWrapper file = new EncryptableFileWrapper(new HashedFile.FileSystemWrapper(new File(projectDir, filePath).getAbsolutePath()), projectInfoFile);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        byte[] contents = file.getContents();
-        monitor.beginTask(monitorTask, contents.length / 1024);
-        baos.write(contents);
+        ByteArrayInputStream bais = new ByteArrayInputStream(bs);
+        EncryptableFileWrapper file = new EncryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(bais)), projectInfoFile);
+        byte[] content = file.getContents();
+        String ipfsHash = put(filePath, content);
+        monitor.beginTask(monitorTask, content.length / 1024);
         monitor.endTask();
-        return baos;
+        return ipfsHash;
     }
 }

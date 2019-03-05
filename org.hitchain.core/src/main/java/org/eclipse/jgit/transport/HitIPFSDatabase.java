@@ -8,6 +8,7 @@
  ******************************************************************************/
 package org.eclipse.jgit.transport;
 
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.*;
@@ -25,32 +26,33 @@ import java.util.*;
  * auto generate by qdp.
  */
 public class HitIPFSDatabase extends WalkRemoteObjectDatabase {
-    //private String bucketName;
-    private String objectsKey;
     private HitIPFSStorage hit;
 
-    public HitIPFSDatabase(HitIPFSStorage hit, String objectsKey) {
+    public HitIPFSDatabase(HitIPFSStorage hit) {
         this.hit = hit;
-        this.objectsKey = objectsKey;
     }
 
-    protected String resolveKey(String subpath) {
-        if (subpath.endsWith("/")) {
-            subpath = subpath.substring(0, subpath.length() - 1);
+    /**
+     * default path is point to "objects/".
+     *
+     * @param objectsKeyOrPath
+     * @return
+     */
+    protected String resolveKey(String objectsKeyOrPath) {
+        boolean projectRootDir = StringUtils.startsWith(objectsKeyOrPath, ROOT_DIR);
+        if (projectRootDir) {
+            objectsKeyOrPath = objectsKeyOrPath.substring(ROOT_DIR.length());
         }
-        String k = objectsKey;
-        while (subpath.startsWith(ROOT_DIR)) {
-            k = k.substring(0, k.lastIndexOf('/'));
-            subpath = subpath.substring(3);
-        }
-        return k + "/" + subpath;
+        objectsKeyOrPath = StringUtils.removeStart(objectsKeyOrPath, "/");
+        objectsKeyOrPath = StringUtils.removeEnd(objectsKeyOrPath, "/");
+        return projectRootDir ? objectsKeyOrPath : ("objects/" + objectsKeyOrPath);
     }
 
     public URIish getURI() {
         URIish u = new URIish();
         u = u.setScheme(TransportHit.HIT_SCHEME);
-        u = u.setHost("localhost");
-        u = u.setPath("/" + objectsKey);
+        u = u.setHost("www.hitchain.org");
+        u = u.setPath("/");
         return u;
     }
 
@@ -64,7 +66,7 @@ public class HitIPFSDatabase extends WalkRemoteObjectDatabase {
     }
 
     public WalkRemoteObjectDatabase openAlternate(String location) throws IOException {
-        return new HitIPFSDatabase(hit, resolveKey(location));
+        return new HitIPFSDatabase(hit);
     }
 
     public Collection<String> getPackNames() throws IOException {
@@ -101,7 +103,7 @@ public class HitIPFSDatabase extends WalkRemoteObjectDatabase {
     }
 
     public void writeFile(String path, byte[] data) throws IOException {
-        hit.put(resolveKey(path), data);
+        String ipfsHash = hit.put(resolveKey(path), data);
     }
 
     protected Map<String, Ref> readAdvertisedRefs() throws TransportException {

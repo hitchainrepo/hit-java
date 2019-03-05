@@ -48,10 +48,9 @@ import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
 import org.hitchain.core.HitIPFSStorage;
+import org.hitchain.hit.util.Tuple.Two;
 
 import java.io.File;
-import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.*;
 
 /**
@@ -114,6 +113,9 @@ public class TransportHit extends HttpTransport implements WalkTransport {
         //            return new TransportHit(uri);
         //        }
     };
+    // hit://contract-entrance/contract-address.git
+    // hits://contract-entrance/contract-address.git
+    // hit://contract-address.git
     public static String HIT_SCHEME = "hit";
     public static final TransportProtocol PROTO_HIT = new TransportProtocol() {
         public String getName() {
@@ -138,87 +140,22 @@ public class TransportHit extends HttpTransport implements WalkTransport {
     };
 
     /**
-     * User information necessary to connect to S3.
+     * User information necessary to connect to hit.
      */
-    HitIPFSStorage hit;
-
-    /**
-     * Bucket the remote repository is stored in.
-     */
-    //String bucket;
-
-    /**
-     * Key prefix which all objects related to the repository start with.
-     * <p>
-     * The prefix does not start with "/".
-     * <p>
-     * The prefix does not end with "/". The trailing slash is stripped during
-     * the constructor if a trailing slash was supplied in the URIish.
-     * <p>
-     * All files within the remote repository start with
-     * <code>keyPrefix + "/"</code>.
-     */
-    private String keyPrefix;
+    protected HitIPFSStorage hit;
 
     protected TransportHit(Repository local, URIish uri) throws NotSupportedException {
         super(local, uri);
-        //Properties props = loadProperties();
         File projectDir = local.getDirectory();
-        //if (!props.containsKey("tmpdir") && directory != null) {
-        //    props.put("tmpdir", directory.getPath());
-        //}
-
         hit = new HitIPFSStorage(projectDir);
         //bucket = uri.getHost();
-
-        String p = uri.getPath();
-        if (p.startsWith("/")) {
-            p = p.substring(1);
-        }
-        if (p.endsWith("/")) {
-            p = p.substring(0, p.length() - 1);
-        }
-        keyPrefix = p;
     }
-
-//    private static Properties loadPropertiesFile(File propsFile) throws NotSupportedException {
-//        try {
-//            return AmazonS3.properties(propsFile);
-//        } catch (IOException e) {
-//            throw new NotSupportedException(MessageFormat.format(JGitText.get().cannotReadFile, propsFile), e);
-//        }
-//    }
-
-//    private Properties loadProperties() throws NotSupportedException {
-//        if (local.getDirectory() != null) {
-//            File propsFile = new File(local.getDirectory(), uri.getUser());
-//            if (propsFile.isFile()) {
-//                return loadPropertiesFile(propsFile);
-//            }
-//        }
-//
-//        File propsFile = new File(local.getFS().userHome(), uri.getUser());
-//        if (propsFile.isFile()) {
-//            return loadPropertiesFile(propsFile);
-//        }
-//
-//        Properties props = new Properties();
-//        String user = uri.getUser();
-//        String pass = uri.getPass();
-//        if (user != null && pass != null) {
-//            props.setProperty("accesskey", user);
-//            props.setProperty("secretkey", pass);
-//        } else {
-//            throw new NotSupportedException(MessageFormat.format(JGitText.get().cannotReadFile, propsFile));
-//        }
-//        return props;
-//    }
 
     /**
      * {@inheritDoc}
      */
     public FetchConnection openFetch() throws TransportException {
-        HitIPFSDatabase c = new HitIPFSDatabase(hit, keyPrefix + "/objects");
+        HitIPFSDatabase c = new HitIPFSDatabase(hit);
         WalkFetchConnection r = new WalkFetchConnection(this, c);
         r.available(c.readAdvertisedRefs());
         return r;
@@ -228,7 +165,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
      * {@inheritDoc}
      */
     public PushConnection openPush() throws TransportException {
-        HitIPFSDatabase c = new HitIPFSDatabase(hit,keyPrefix + "/objects");
+        HitIPFSDatabase c = new HitIPFSDatabase(hit);
         WalkPushConnection r = new WalkPushConnection(this, c);
         r.available(c.readAdvertisedRefs());
         return r;
@@ -239,5 +176,10 @@ public class TransportHit extends HttpTransport implements WalkTransport {
      */
     public void close() {
         // No explicit connections are maintained.
+        Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> uploadedGitFileIndex = hit.getUploadedGitFileIndex();
+        File projectDir = local.getDirectory();
+        for (Map.Entry<String, Two<Object, String, String>> entry : uploadedGitFileIndex.entrySet()) {
+            System.out.println("Upload:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:" + entry.getValue().second());
+        }
     }
 }
