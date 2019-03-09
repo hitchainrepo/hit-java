@@ -41,11 +41,6 @@
             <name>apache maven</name>
             <url>http://repo1.maven.org/maven2</url>
         </pluginRepository>
-        <pluginRepository>
-            <id>apache-maven</id>
-            <name>apache maven</name>
-            <url>http://repo1.maven.org/maven2</url>
-        </pluginRepository>
     </pluginRepositories>
     <dependencies>
         <!-- common -->
