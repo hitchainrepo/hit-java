@@ -733,6 +733,9 @@
   <profiles>
     <profile>
       <id>javac</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
       <build>
         <plugins>
           <plugin>
@@ -800,7 +803,7 @@
     <profile>
       <id>ecj</id>
       <activation>
-        <activeByDefault>true</activeByDefault>
+        <activeByDefault>false</activeByDefault>
       </activation>
       <build>
         <plugins>
@@ -932,6 +935,7 @@
     <module>org.eclipse.jgit.junit.http</module>
     <module>org.eclipse.jgit.junit.ssh</module>
 
+    <module>org.hitchain.core.test</module>
     <module>org.eclipse.jgit.test</module>
     <module>org.eclipse.jgit.ant.test</module>
     <module>org.eclipse.jgit.http.test</module>
