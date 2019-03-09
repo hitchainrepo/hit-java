@@ -1,4 +1,4 @@
-/*******************************************************************************
+package org.hitchain.core; /*******************************************************************************
  * Copyright (c) 2019-01-16 @author <a href="mailto:iffiff1@gmail.com">Tyler Chen</a>.
  * All rights reserved.
  *
@@ -7,10 +7,11 @@
  * Auto Generate By foreveross.com Quick Deliver Platform. 
  ******************************************************************************/
 
-import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.Random;
 
 /**
  * MainTest
@@ -22,19 +23,21 @@ import java.io.FileOutputStream;
 public class MainTest {
     public static void main(String[] args) throws Exception {
         File dir = new File("/Users/zhaochen/Desktop/temppath");
-        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/aatest");
+        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/hello");
         try {
             System.setProperty("user.dir", dir.getAbsolutePath());
             gitClone();
-            File file = new File(new File(dir, "aatest"), "aaa-1547624216414.txt");
-            FileOutputStream fos = new FileOutputStream(file);
-            fos.write(("hello world" + System.currentTimeMillis()).getBytes());
-            fos.close();
-            exec("git add "+file.getName());
-            exec("git commit -m 'hello-"+System.currentTimeMillis()+"'");
+            for (int i = 0; i < 10; i++) {
+                File file = new File(new File(dir, "hello"), "aaa-1547624216414.txt");
+                FileOutputStream fos = new FileOutputStream(file);
+                fos.write((StringUtils.repeat("hello world", new Random().nextInt(100)) + System.currentTimeMillis()).getBytes());
+                fos.close();
+                exec("git add " + file.getName());
+                exec("git commit -m 'hello-" + System.currentTimeMillis() + "'");
+            }
             exec("git push");
         } finally {
-            FileUtils.deleteDirectory(new File(dir, "aatest"));
+            //FileUtils.deleteDirectory(new File(dir, "hello"));
         }
     }
 
@@ -44,7 +47,7 @@ public class MainTest {
 
     public static void gitClone() throws Exception {
         org.eclipse.jgit.pgm.Main.main(new String[]{
-                "clone", "http://localhost:8080/git/root/aatest.git"
+                "clone", "hit://0x73b83720d75ae871c22123856027cb2c32193cb3.git"
         });
     }
 }
