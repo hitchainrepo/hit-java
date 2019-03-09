@@ -35,17 +35,17 @@ public class HitIPFSDatabase extends WalkRemoteObjectDatabase {
     /**
      * default path is point to "objects/".
      *
-     * @param objectsKeyOrPath
+     * @param path
      * @return
      */
-    protected String resolveKey(String objectsKeyOrPath) {
-        boolean projectRootDir = StringUtils.startsWith(objectsKeyOrPath, ROOT_DIR);
-        if (projectRootDir) {
-            objectsKeyOrPath = objectsKeyOrPath.substring(ROOT_DIR.length());
+    protected String resolvePath(String path) {
+        boolean toRoot = StringUtils.startsWith(path, ROOT_DIR);
+        if (toRoot) {
+            path = path.substring(ROOT_DIR.length());
         }
-        objectsKeyOrPath = StringUtils.removeStart(objectsKeyOrPath, "/");
-        objectsKeyOrPath = StringUtils.removeEnd(objectsKeyOrPath, "/");
-        return projectRootDir ? objectsKeyOrPath : ("objects/" + objectsKeyOrPath);
+        path = StringUtils.removeStart(path, "/");
+        path = StringUtils.removeEnd(path, "/");
+        return toRoot ? path : ("objects/" + path);
     }
 
     public URIish getURI() {
@@ -71,7 +71,7 @@ public class HitIPFSDatabase extends WalkRemoteObjectDatabase {
 
     public Collection<String> getPackNames() throws IOException {
         HashSet<String> have = new HashSet<>();
-        have.addAll(hit.list(resolveKey("pack")));
+        have.addAll(hit.list("objects/pack"));
 
         Collection<String> packs = new ArrayList<>();
         for (String n : have) {
@@ -87,7 +87,7 @@ public class HitIPFSDatabase extends WalkRemoteObjectDatabase {
     }
 
     public FileStream open(String path) throws IOException {
-        byte[] bs = hit.get(resolveKey(path));
+        byte[] bs = hit.get(resolvePath(path));
         bs = bs == null ? new byte[0] : bs;
         int len = bs.length;
         return new FileStream(new ByteArrayInputStream(bs), len);
@@ -95,15 +95,15 @@ public class HitIPFSDatabase extends WalkRemoteObjectDatabase {
 
 
     public void deleteFile(String path) throws IOException {
-        hit.delete(resolveKey(path));
+        hit.delete(resolvePath(path));
     }
 
     public OutputStream writeFile(String path, ProgressMonitor monitor, String monitorTask) throws IOException {
-        return hit.beginPut(resolveKey(path), monitor, monitorTask);
+        return hit.beginPut(resolvePath(path), monitor, monitorTask);
     }
 
     public void writeFile(String path, byte[] data) throws IOException {
-        String ipfsHash = hit.put(resolveKey(path), data);
+        hit.put(resolvePath(path), data);
     }
 
     protected Map<String, Ref> readAdvertisedRefs() throws TransportException {
@@ -116,8 +116,8 @@ public class HitIPFSDatabase extends WalkRemoteObjectDatabase {
 
     protected void readLooseRefs(TreeMap<String, Ref> avail) throws TransportException {
         try {
-            for (String n : hit.list(resolveKey(ROOT_DIR + "refs"))) {
-                readRef(avail, "refs/" + n);
+            for (String n : hit.list("refs")) {
+                readRef(avail, n);
             }
         } catch (IOException e) {
             throw new TransportException(getURI(), JGitText.get().cannotListRefs, e);
@@ -126,7 +126,7 @@ public class HitIPFSDatabase extends WalkRemoteObjectDatabase {
 
     protected Ref readRef(TreeMap<String, Ref> avail, String rn) throws TransportException {
         String s;
-        String ref = ROOT_DIR + rn;
+        String ref = ROOT_DIR + rn;// to root dir.
         try {
             try (BufferedReader br = openReader(ref)) {
                 s = br.readLine();

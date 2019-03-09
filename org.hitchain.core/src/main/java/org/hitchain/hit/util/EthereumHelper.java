@@ -41,6 +41,8 @@ import java.security.cert.CertificateException;
  */
 public class EthereumHelper {
 
+    public static final String ERROR_PREFIX = "ERROR:";
+
     /**
      * 绕过验证
      *
@@ -107,7 +109,7 @@ public class EthereumHelper {
             }
             return StringUtils.defaultString(result, "ERROR:null");
         } catch (Exception e) {
-            return "ERROR:" + e.getMessage();
+            return ERROR_PREFIX + e.getMessage();
         }
     }
 
@@ -116,15 +118,15 @@ public class EthereumHelper {
         String url = urlBase + "/api/web3j/deployRepositoryNameContract";
         String content = "PrivateKey=-\nGasLimit=5000000\nGwei=0\n";
         String address = post(url, content);
-        if (StringUtils.startsWith(address, "ERROR:")) {
+        if (isError(address)) {
             for (int i = 0; i < 10; i++) {
                 address = post(url, content);
-                if (!address.startsWith("ERROR:")) {
+                if (!isError(address)) {
                     break;
                 }
             }
         }
-        if (StringUtils.startsWith(address, "ERROR:")) {
+        if (isError(address)) {
             return null;
         }
         //====init
@@ -132,10 +134,10 @@ public class EthereumHelper {
         content = "PrivateKey=-\n" + "ContractAddress=" + address + "\n" + "FunctionName=init(addr,repoName)\n"
                 + "Arg1=" + ownerAddressEcc + "\n" + "Arg2=" + projectName + "\n" + "GasLimit=5000000\n" + "Gwei=0\n";
         String init = post(url, content);
-        if (StringUtils.startsWith(init, "ERROR:")) {
+        if (isError(init)) {
             for (int i = 0; i < 10; i++) {
                 init = post(url, content);
-                if (!init.startsWith("ERROR:")) {
+                if (!isError(init)) {
                     return address;
                 }
             }
@@ -157,7 +159,7 @@ public class EthereumHelper {
                     + "FunctionName=updateRepositoryAddress(oldAddr,newAddr)\n" + "Arg1=" + oldProjectAddress + "\n"
                     + "Arg2=" + newProjectHash + "\n" + "GasLimit=5000000\n" + "Gwei=0\n";
             result = post(url, content);
-            if (!StringUtils.startsWith(result, "ERROR:")) {
+            if (!isError(result)) {
                 return;
             }
         }
@@ -174,6 +176,10 @@ public class EthereumHelper {
         String url = urlBase + "/api/web3j/encryptPrivateKey";
         String content = "PrivateKey=" + priKeyEcc + "\n";
         String encrypt = post(url, content);
-        return StringUtils.startsWith(encrypt, "ERROR:") ? null : encrypt;
+        return isError(encrypt) ? null : encrypt;
+    }
+
+    public static boolean isError(String result) {
+        return StringUtils.startsWith(result, ERROR_PREFIX);
     }
 }

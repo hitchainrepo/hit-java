@@ -15,6 +15,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.transport.URIish;
+import org.hitchain.hit.api.DecryptableFileWrapper;
 import org.hitchain.hit.api.EncryptableFileWrapper;
 import org.hitchain.hit.api.HashedFile;
 import org.hitchain.hit.api.ProjectInfoFile;
@@ -38,19 +40,55 @@ import java.util.Map;
  */
 public class HitIPFSStorage {
 
+    private URIish uri;
     private File projectDir;
     private ProjectInfoFile projectInfoFile;
     private IPFS ipfs;
     private Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileIndex;
     private Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> uploadedGitFileIndex = new HashMap<>();
 
-    public HitIPFSStorage(File projectDir) {
+    public HitIPFSStorage(File projectDir, URIish uri) {
         this.projectDir = projectDir;
-        projectInfoFile = GitHelper.readProjectInfoFile(projectDir);
-        String projectAddress = EthereumHelper.getProjectAddress(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress());
-        String gitFileIndexHash = projectAddress;
-        ipfs = GitHelper.getIpfs(projectInfoFile.getFileServerUrl());
-        gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
+        this.uri = uri;
+        if (!GitHelper.isValidHitRepository(projectDir)) {
+            String host = uri.getHost();
+            String path = uri.getRawPath();
+            if (StringUtils.isBlank(path)) {
+                path = host;
+                host = GitHelper.URL_ETHER;
+            } else {
+                host = "https://" + host;
+            }
+            String contractAddress = StringUtils.removeEnd(StringUtils.removeStart(path, "/"), ".git");
+            String projectAddress = EthereumHelper.getProjectAddress(host, contractAddress);
+            if (StringUtils.isNotBlank(projectAddress) && !EthereumHelper.isError(projectAddress)) {// is valid contract address and have content.
+                String gitFileIndexHash = projectAddress;
+                ipfs = GitHelper.getIpfs();
+                gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
+                Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get("objects/info/projectinfo");
+                if (StringUtils.isNotBlank(ipfsHashAndSha1.first())) {
+                    try {
+                        byte[] cat = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
+                        projectInfoFile = ProjectInfoFile.fromFile(
+                                new HashedFile.FileWrapper("objects/info/projectinfo", new HashedFile.InputStreamCallback() {
+                                    public InputStream call(HashedFile hashedFile) throws IOException {
+                                        return new ByteArrayInputStream(cat);
+                                    }
+                                }));
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+        }
+        if (projectInfoFile == null) {
+            GitHelper.onInitHitRepository(projectDir);
+            projectInfoFile = GitHelper.readProjectInfoFile(projectDir);
+            String projectAddress = EthereumHelper.getProjectAddress(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress());
+            String gitFileIndexHash = projectAddress;
+            ipfs = GitHelper.getIpfs(projectInfoFile.getFileServerUrl());
+            gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
+        }
     }
 
     /**
@@ -88,7 +126,11 @@ public class HitIPFSStorage {
         if (ipfsHashAndSha1 == null || StringUtils.isBlank(ipfsHashAndSha1.first())) {
             return null;
         }
-        return ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
+        System.out.println("get filename:" + filePath + ", ipfs:" + ipfsHashAndSha1.first() + ", sha1:" + ipfsHashAndSha1.second());
+        byte[] content = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
+        System.out.println("file content:" + new String(content));
+        DecryptableFileWrapper file = new DecryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(content)), projectInfoFile, "root", GitHelper.rootPriKeyRsa);
+        return file.getContents();
     }
 
     /**
@@ -110,6 +152,7 @@ public class HitIPFSStorage {
      * @return ipfs hash.
      */
     public String put(String filePath, byte[] data) {
+        System.out.println("Put file:" + filePath + "...");
         try {
             ByteArrayInputStream is = new ByteArrayInputStream(data);
             EncryptableFileWrapper file = new EncryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(is)), projectInfoFile);
@@ -121,6 +164,7 @@ public class HitIPFSStorage {
                 }
                 uploadedGitFileIndex.put(filePath, new Two(ipfsHash, GitHelper.sha1(data)));
             }
+            System.out.println("Put file:" + filePath + ", ipfs:" + ipfsHash);
             return ipfsHash;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -137,6 +181,7 @@ public class HitIPFSStorage {
      * @throws IOException
      */
     public OutputStream beginPut(String filePath, ProgressMonitor monitor, String monitorTask) throws IOException {
+        System.out.println("BeginPut file:" + filePath + "...");
         ByteArrayOutputStream os = new ByteArrayOutputStream() {
             public void close() throws IOException {
                 onBeginPutClose(filePath, monitor, monitorTask, toByteArray());
@@ -146,12 +191,33 @@ public class HitIPFSStorage {
     }
 
     /**
-     * return uploaded git file hash: Map<String:relativeFilePath, Two<Object, String:ipfsHash, String:sha1>>
+     * return uploaded git file hash: Map<String:relativeFilePath, Two<Object, String:ipfsHash, String:sha1>>.
      *
      * @return
      */
     public Map<String, Two<Object, String, String>> getUploadedGitFileIndex() {
         return uploadedGitFileIndex;
+    }
+
+    /**
+     * return ipfs git file hash: Map<String:relativeFilePath, Two<Object, String:ipfsHash, String:sha1>>.
+     *
+     * @return
+     */
+    public Map<String, Two<Object, String, String>> getGitFileIndex() {
+        return gitFileIndex;
+    }
+
+    public ProjectInfoFile getProjectInfoFile() {
+        return projectInfoFile;
+    }
+
+    public File getProjectDir() {
+        return projectDir;
+    }
+
+    public IPFS getIpfs() {
+        return ipfs;
     }
 
     protected String onBeginPutClose(String filePath, ProgressMonitor monitor, String monitorTask, byte[] bs) throws IOException {

@@ -43,11 +43,12 @@
 
 package org.eclipse.jgit.transport;
 
+import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
 import org.hitchain.core.HitIPFSStorage;
+import org.hitchain.hit.util.GitHelper;
 import org.hitchain.hit.util.Tuple.Two;
 
 import java.io.File;
@@ -79,66 +80,11 @@ import java.util.*;
  * @see WalkPushConnection
  */
 public class TransportHit extends HttpTransport implements WalkTransport {
-    public static final TransportProtocol PROTO_HTTP = new TransportProtocol() {
-        private String[] schemeNames = {"http", "https"};
-
-        private Set<String> schemeSet = Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(schemeNames)));
-
-        public String getName() {
-            return JGitText.get().transportProtoHTTP;
-        }
-
-        public Set<String> getSchemes() {
-            return schemeSet;
-        }
-
-        public Set<URIishField> getRequiredFields() {
-            return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST, URIishField.PATH));
-        }
-
-        public Set<URIishField> getOptionalFields() {
-            return Collections.unmodifiableSet(EnumSet.of(URIishField.USER, URIishField.PASS, URIishField.PORT));
-        }
-
-        public int getDefaultPort() {
-            return 80;
-        }
-
-        public Transport open(URIish uri, Repository local, String remoteName) throws NotSupportedException {
-            return new TransportHit(local, uri);
-        }
-
-        //TODO
-        //        public Transport open(URIish uri) throws NotSupportedException {
-        //            return new TransportHit(uri);
-        //        }
-    };
+    public static final HitTransportProtocol PROTO_HIT = new HitTransportProtocol();
     // hit://contract-entrance/contract-address.git
     // hits://contract-entrance/contract-address.git
     // hit://contract-address.git
     public static String HIT_SCHEME = "hit";
-    public static final TransportProtocol PROTO_HIT = new TransportProtocol() {
-        public String getName() {
-            return "HitChain";
-        }
-
-        public Set<String> getSchemes() {
-            return Collections.singleton(HIT_SCHEME);
-        }
-
-        public Set<URIishField> getRequiredFields() {
-            return Collections.unmodifiableSet(EnumSet.of(URIishField.USER, URIishField.HOST, URIishField.PATH));
-        }
-
-        public Set<URIishField> getOptionalFields() {
-            return Collections.unmodifiableSet(EnumSet.of(URIishField.PASS));
-        }
-
-        public Transport open(URIish uri, Repository local, String remoteName) throws NotSupportedException {
-            return new TransportHit(local, uri);
-        }
-    };
-
     /**
      * User information necessary to connect to hit.
      */
@@ -147,8 +93,25 @@ public class TransportHit extends HttpTransport implements WalkTransport {
     protected TransportHit(Repository local, URIish uri) throws NotSupportedException {
         super(local, uri);
         File projectDir = local.getDirectory();
-        hit = new HitIPFSStorage(projectDir);
-        //bucket = uri.getHost();
+        hit = new HitIPFSStorage(projectDir, uri);
+    }
+
+    /**
+     * list git files.
+     *
+     * @param projectDir
+     * @return {relativePath/fileName: File}
+     */
+    private static Map<String/* relativePath */, File> listGitObjectsFiles(File projectDir) {
+        String basePath = projectDir.getAbsolutePath();
+        Collection<File> files = FileUtils.listFiles(new File(projectDir, "objects"), null, true);
+        Map<String, File> map = new HashMap<>();
+        for (File file : files) {
+            if (file.isFile()) {
+                map.put(file.getAbsolutePath().substring(basePath.length() + 1), file);
+            }
+        }
+        return map;
     }
 
     /**
@@ -178,8 +141,54 @@ public class TransportHit extends HttpTransport implements WalkTransport {
         // No explicit connections are maintained.
         Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> uploadedGitFileIndex = hit.getUploadedGitFileIndex();
         File projectDir = local.getDirectory();
+        Map<String, Two<Object, String, String>> gitFileIndex = hit.getGitFileIndex();
+        {// upload missing objects.
+            Map<String, File> objects = listGitObjectsFiles(projectDir);
+            for (Map.Entry<String, File> entry : objects.entrySet()) {
+                if (uploadedGitFileIndex.containsKey(entry.getKey())) {
+                    continue;
+                }
+                if (gitFileIndex.containsKey(entry.getKey())) {
+                    continue;
+                }
+                try {
+                    hit.put(entry.getKey(), FileUtils.readFileToByteArray(entry.getValue()));
+                    System.out.println("Upload missing objects:" + entry.getKey());
+                } catch (Exception e) {
+                    new RuntimeException(e);
+                }
+            }
+        }
+        uploadedGitFileIndex = hit.getUploadedGitFileIndex();
         for (Map.Entry<String, Two<Object, String, String>> entry : uploadedGitFileIndex.entrySet()) {
             System.out.println("Upload:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:" + entry.getValue().second());
+        }
+        GitHelper.updateHitRepositoryGitFileIndex(projectDir, hit.getProjectInfoFile(), gitFileIndex, uploadedGitFileIndex);
+    }
+
+    public static class HitTransportProtocol extends TransportProtocol {
+        public String getName() {
+            return "HitChain";
+        }
+
+        public Set<String> getSchemes() {
+            return Collections.singleton(HIT_SCHEME);
+        }
+
+        public Set<URIishField> getRequiredFields() {
+            return Collections.unmodifiableSet(EnumSet.of(URIishField.USER, URIishField.HOST, URIishField.PATH));
+        }
+
+        public Set<URIishField> getOptionalFields() {
+            return Collections.unmodifiableSet(EnumSet.of(URIishField.PASS));
+        }
+
+        public Transport open(URIish uri, Repository local, String remoteName) throws NotSupportedException {
+            return new TransportHit(local, uri);
+        }
+
+        public boolean canHandle(URIish uri, Repository local, String remoteName) {
+            return HIT_SCHEME.equals(uri.getScheme()) && uri.toString().endsWith(".git");
         }
     }
 }
