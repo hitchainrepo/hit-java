@@ -44,9 +44,11 @@
 package org.eclipse.jgit.transport;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.hitchain.core.HitIPFSStorage;
 import org.hitchain.hit.util.GitHelper;
 import org.hitchain.hit.util.Tuple.Two;
@@ -140,6 +142,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
     public void close() {
         // No explicit connections are maintained.
         updateHitFile();
+        updateOriginAfterInitPush();
         Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> uploadedGitFileIndex = hit.getUploadedGitFileIndex();
         if (uploadedGitFileIndex.isEmpty()) {
             return;// this command is not the push command, maybe fetch.
@@ -184,6 +187,25 @@ public class TransportHit extends HttpTransport implements WalkTransport {
                 FileUtils.writeByteArrayToFile(new File(projectDir, GitHelper.HIT_PROJECT_INFO), bytes);
                 System.out.println("Update " + GitHelper.HIT_PROJECT_INFO);
             }
+        } catch (Exception e) {
+            throw new RuntimeException("Can not download hit file.");
+        }
+    }
+
+    private void updateOriginAfterInitPush() {
+        try {
+            StoredConfig config = local.getConfig();
+            config.load();
+            String uri = config.getString("remote", "origin", "url");
+            // if is blank or is not the right hit uri then change the uri to the right hit uri.
+            String repoAddress = hit.getProjectInfoFile().getRepoAddress() + ".git";
+            if (!(StringUtils.isBlank(uri) || (uri.startsWith("hit://") && !StringUtils.endsWith(uri, repoAddress)))) {
+                return;
+            }
+            String hitUri = "hit://" + repoAddress;
+            config.setString("remote", "origin", "url", hitUri);
+            config.save();
+            System.out.println("Update remote origin url to " + hitUri);
         } catch (Exception e) {
             throw new RuntimeException("Can not download hit file.");
         }
