@@ -65,6 +65,9 @@ public class HitIPFSStorage {
                 String gitFileIndexHash = projectAddress;
                 ipfs = GitHelper.getIpfs();
                 gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
+                {
+                    gitFileIndex.put(GitHelper.HIT_GITFILE_IDX, new Two<>(gitFileIndexHash, ""));
+                }
                 Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get(GitHelper.HIT_PROJECT_INFO);
                 if (StringUtils.isNotBlank(ipfsHashAndSha1.first())) {
                     try {
@@ -88,6 +91,9 @@ public class HitIPFSStorage {
             String gitFileIndexHash = projectAddress;
             ipfs = GitHelper.getIpfs(projectInfoFile.getFileServerUrl());
             gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
+            {
+                gitFileIndex.put(GitHelper.HIT_GITFILE_IDX, new Two<>(gitFileIndexHash, ""));
+            }
         }
     }
 
