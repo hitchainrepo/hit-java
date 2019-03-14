@@ -69,11 +69,11 @@ public class HitURIish extends URIish {
                 String gitFileIndexHash = projectAddress;
                 IPFS ipfs = GitHelper.getIpfs();
                 Map<String/* filename */, Tuple.Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
-                Tuple.Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get("objects/info/projectinfo");
+                Tuple.Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get(GitHelper.HIT_PROJECT_INFO);
                 if (StringUtils.isNotBlank(ipfsHashAndSha1.first())) {
                     byte[] cat = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
                     ProjectInfoFile projectInfoFile = ProjectInfoFile.fromFile(
-                            new HashedFile.FileWrapper("objects/info/projectinfo", new HashedFile.InputStreamCallback() {
+                            new HashedFile.FileWrapper(GitHelper.HIT_PROJECT_INFO, new HashedFile.InputStreamCallback() {
                                 public InputStream call(HashedFile hashedFile) throws IOException {
                                     return new ByteArrayInputStream(cat);
                                 }
