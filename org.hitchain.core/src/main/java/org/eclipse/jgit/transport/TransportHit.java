@@ -139,6 +139,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
      */
     public void close() {
         // No explicit connections are maintained.
+        updateHitFile();
         Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> uploadedGitFileIndex = hit.getUploadedGitFileIndex();
         if (uploadedGitFileIndex.isEmpty()) {
             return;// this command is not the push command, maybe fetch.
@@ -167,6 +168,25 @@ public class TransportHit extends HttpTransport implements WalkTransport {
             System.out.println("Upload:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:" + entry.getValue().second());
         }
         GitHelper.updateHitRepositoryGitFileIndex(projectDir, hit.getProjectInfoFile(), gitFileIndex, uploadedGitFileIndex);
+    }
+
+    private void updateHitFile() {
+        try {
+            {
+                byte[] bytes = hit.get(GitHelper.HIT_GITFILE_IDX);
+                File projectDir = local.getDirectory();
+                FileUtils.writeByteArrayToFile(new File(projectDir, GitHelper.HIT_GITFILE_IDX), bytes);
+                System.out.println("Update " + GitHelper.HIT_GITFILE_IDX);
+            }
+            {
+                byte[] bytes = hit.get(GitHelper.HIT_PROJECT_INFO);
+                File projectDir = local.getDirectory();
+                FileUtils.writeByteArrayToFile(new File(projectDir, GitHelper.HIT_PROJECT_INFO), bytes);
+                System.out.println("Update " + GitHelper.HIT_PROJECT_INFO);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Can not download hit file.");
+        }
     }
 
     public static class HitTransportProtocol extends TransportProtocol {
