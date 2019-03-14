@@ -77,29 +77,38 @@ public class GitHelper {
      */
     public static void onInitHitRepository(File projectDir) {
         IPFS ipfs = getIpfs();
+        boolean isLog = false;
         //#1.Get or create ProjectInfoFile.
         ProjectInfoFile projectInfoFile = readProjectInfoFile(projectDir);
         //#2.Get GitFileIndex from ProjectInfoFile contract address.
         Map<String/*fileName*/, Two<Object, String/* ipfs hash */, String/* sha1 */>> oldGitFileIndex = readGitFileIndexFromLocal(projectDir);
-        for (Entry<String, Two<Object, String, String>> entry : oldGitFileIndex.entrySet()) {
-            System.out.println("OLD:" + entry.getKey());
+        if (isLog) {
+            for (Entry<String, Two<Object, String, String>> entry : oldGitFileIndex.entrySet()) {
+                System.out.println("OLD:" + entry.getKey());
+            }
         }
         //#3.List all current files.
         Map<String, File> current = listGitFiles(projectDir);
-        for (Entry<String, File> entry : current.entrySet()) {
-            System.out.println("CURR:" + entry.getKey());
+        if (isLog) {
+            for (Entry<String, File> entry : current.entrySet()) {
+                System.out.println("CURR:" + entry.getKey());
+            }
         }
         //#4.Compare current files and GitFileIndex and get the changed files.
         Two<Object, Map<String, File>/*add*/, Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>>/*remove*/> tuple = diffGitFiles(current, oldGitFileIndex);
         //#5.Write changed files to ipfs.
         Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> newGitFileIndexToIpfs = writeNewFileToIpfs(tuple.first(), projectInfoFile, ipfs);
-        for (Entry<String, Two<Object, String, String>> entry : newGitFileIndexToIpfs.entrySet()) {
-            System.out.println("ADD:" + entry.getKey());
+        if (isLog) {
+            for (Entry<String, Two<Object, String, String>> entry : newGitFileIndexToIpfs.entrySet()) {
+                System.out.println("ADD:" + entry.getKey());
+            }
         }
         //#6.Gen the new GitFileIndex.
         Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> newGitFileIndex = generateNewGitFileIndex(current, oldGitFileIndex, newGitFileIndexToIpfs);
-        for (Entry<String, Two<Object, String, String>> entry : newGitFileIndex.entrySet()) {
-            System.out.println("NEW:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:" + entry.getValue().second());
+        if (isLog) {
+            for (Entry<String, Two<Object, String, String>> entry : newGitFileIndex.entrySet()) {
+                System.out.println("NEW:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:" + entry.getValue().second());
+            }
         }
         //#7.Write the new GitFileIndex to disk and ipfs.
         String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, newGitFileIndex);
@@ -136,29 +145,38 @@ public class GitHelper {
      */
     public static void onPush(File projectDir) {
         IPFS ipfs = getIpfs();
+        boolean isLog = false;
         //#1.Get or create ProjectInfoFile.
         ProjectInfoFile projectInfoFile = readProjectInfoFile(projectDir);
         //#2.Get GitFileIndex from ProjectInfoFile contract address.
         Map<String/*fileName*/, Two<Object, String/* ipfs hash */, String/* sha1 */>> oldGitFileIndex = readGitFileIndexFromLocal(projectDir);
-        for (Entry<String, Two<Object, String, String>> entry : oldGitFileIndex.entrySet()) {
-            System.out.println("OLD:" + entry.getKey());
+        if (isLog) {
+            for (Entry<String, Two<Object, String, String>> entry : oldGitFileIndex.entrySet()) {
+                System.out.println("OLD:" + entry.getKey());
+            }
         }
         //#3.List all current files.
         Map<String, File> current = listGitFiles(projectDir);
-        for (Entry<String, File> entry : current.entrySet()) {
-            System.out.println("CURR:" + entry.getKey());
+        if (isLog) {
+            for (Entry<String, File> entry : current.entrySet()) {
+                System.out.println("CURR:" + entry.getKey());
+            }
         }
         //#4.Compare current files and GitFileIndex and get the changed files.
         Two<Object, Map<String, File>/*add*/, Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>>/*remove*/> tuple = diffGitFiles(current, oldGitFileIndex);
         //#5.Write changed files to ipfs.
         Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> newGitFileIndexToIpfs = writeNewFileToIpfs(tuple.first(), projectInfoFile, ipfs);
-        for (Entry<String, Two<Object, String, String>> entry : newGitFileIndexToIpfs.entrySet()) {
-            System.out.println("ADD:" + entry.getKey());
+        if (isLog) {
+            for (Entry<String, Two<Object, String, String>> entry : newGitFileIndexToIpfs.entrySet()) {
+                System.out.println("ADD:" + entry.getKey());
+            }
         }
         //#6.Gen the new GitFileIndex.
         Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> newGitFileIndex = generateNewGitFileIndex(current, oldGitFileIndex, newGitFileIndexToIpfs);
-        for (Entry<String, Two<Object, String, String>> entry : newGitFileIndex.entrySet()) {
-            System.out.println("NEW:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:" + entry.getValue().second());
+        if (isLog) {
+            for (Entry<String, Two<Object, String, String>> entry : newGitFileIndex.entrySet()) {
+                System.out.println("NEW:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:" + entry.getValue().second());
+            }
         }
         //#7.Write the new GitFileIndex to disk and ipfs.
         String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, newGitFileIndex);
