@@ -65,12 +65,12 @@ public class HitIPFSStorage {
                 String gitFileIndexHash = projectAddress;
                 ipfs = GitHelper.getIpfs();
                 gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
-                Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get("objects/info/projectinfo");
+                Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get(GitHelper.HIT_PROJECT_INFO);
                 if (StringUtils.isNotBlank(ipfsHashAndSha1.first())) {
                     try {
                         byte[] cat = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
                         projectInfoFile = ProjectInfoFile.fromFile(
-                                new HashedFile.FileWrapper("objects/info/projectinfo", new HashedFile.InputStreamCallback() {
+                                new HashedFile.FileWrapper(GitHelper.HIT_PROJECT_INFO, new HashedFile.InputStreamCallback() {
                                     public InputStream call(HashedFile hashedFile) throws IOException {
                                         return new ByteArrayInputStream(cat);
                                     }
@@ -108,7 +108,7 @@ public class HitIPFSStorage {
             if (prefix.length() < 1) {
                 filePaths.add(filePath);
             } else if (filePath.startsWith(prefix)) {
-                filePaths.add(filePath);
+                filePaths.add(filePath.substring(prefix.length()));
             }
         }
         return filePaths;
@@ -122,13 +122,14 @@ public class HitIPFSStorage {
      * @throws IOException
      */
     public byte[] get(String filePath) throws IOException {
+        System.out.println("get filename:" + filePath);
         Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get(filePath);
         if (ipfsHashAndSha1 == null || StringUtils.isBlank(ipfsHashAndSha1.first())) {
-            return null;
+            throw new FileNotFoundException("File not found: " + filePath);
         }
         System.out.println("get filename:" + filePath + ", ipfs:" + ipfsHashAndSha1.first() + ", sha1:" + ipfsHashAndSha1.second());
         byte[] content = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
-        System.out.println("file content:" + new String(content));
+        //System.out.println("file content:" + new String(content));
         DecryptableFileWrapper file = new DecryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(content)), projectInfoFile, "root", GitHelper.rootPriKeyRsa);
         return file.getContents();
     }
