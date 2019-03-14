@@ -140,6 +140,9 @@ public class TransportHit extends HttpTransport implements WalkTransport {
     public void close() {
         // No explicit connections are maintained.
         Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> uploadedGitFileIndex = hit.getUploadedGitFileIndex();
+        if (uploadedGitFileIndex.isEmpty()) {
+            return;// this command is not the push command, maybe fetch.
+        }
         File projectDir = local.getDirectory();
         Map<String, Two<Object, String, String>> gitFileIndex = hit.getGitFileIndex();
         {// upload missing objects.
@@ -155,7 +158,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
                     hit.put(entry.getKey(), FileUtils.readFileToByteArray(entry.getValue()));
                     System.out.println("Upload missing objects:" + entry.getKey());
                 } catch (Exception e) {
-                    new RuntimeException(e);
+                    throw new RuntimeException(e);
                 }
             }
         }
