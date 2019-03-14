@@ -117,7 +117,7 @@ public class HitIPFSDatabase extends WalkRemoteObjectDatabase {
     protected void readLooseRefs(TreeMap<String, Ref> avail) throws TransportException {
         try {
             for (String n : hit.list("refs")) {
-                readRef(avail, n);
+                readRef(avail, "refs/" + n);
             }
         } catch (IOException e) {
             throw new TransportException(getURI(), JGitText.get().cannotListRefs, e);
