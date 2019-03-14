@@ -69,6 +69,9 @@ public class HitURIish extends URIish {
                 String gitFileIndexHash = projectAddress;
                 IPFS ipfs = GitHelper.getIpfs();
                 Map<String/* filename */, Tuple.Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
+                {
+                    gitFileIndex.put(GitHelper.HIT_GITFILE_IDX, new Tuple.Two<>(gitFileIndexHash, ""));
+                }
                 Tuple.Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get(GitHelper.HIT_PROJECT_INFO);
                 if (StringUtils.isNotBlank(ipfsHashAndSha1.first())) {
                     byte[] cat = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
