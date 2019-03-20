@@ -112,7 +112,7 @@ public class GitHelper {
         }
         //#7.Write the new GitFileIndex to disk and ipfs.
         String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, newGitFileIndex);
-        System.out.println("Project name0: " + projectDir.getPath() + ", gitFileHash: " + URL_IPFS + ":8080/ipfs/" + gitFileIndexHash + ", repoAddress:" + projectInfoFile.getRepoAddress());
+        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + URL_IPFS + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
         //#8.Call contract and update project hash(GitFileIndex hash).
         updateProjectAddress(projectInfoFile, gitFileIndexHash);
     }
@@ -124,7 +124,7 @@ public class GitHelper {
         combine.putAll(upload);
         //#7.Write the new GitFileIndex to disk and ipfs.
         String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, combine);
-        System.out.println("Project name0: " + projectDir.getPath() + ", gitFileHash: " + URL_IPFS + ":8080/ipfs/" + gitFileIndexHash + ", repoAddress:" + projectInfoFile.getRepoAddress());
+        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + URL_IPFS + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
         //#8.Call contract and update project hash(GitFileIndex hash).
         updateProjectAddress(projectInfoFile, gitFileIndexHash);
     }
@@ -180,7 +180,7 @@ public class GitHelper {
         }
         //#7.Write the new GitFileIndex to disk and ipfs.
         String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, newGitFileIndex);
-        System.out.println("Project name0: " + projectDir.getPath() + ", gitFileHash: " + URL_IPFS + ":8080/ipfs/" + gitFileIndexHash + ", repoAddress:" + projectInfoFile.getRepoAddress());
+        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + URL_IPFS + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
         //#8.Call contract and update project hash(GitFileIndex hash).
         updateProjectAddress(projectInfoFile, gitFileIndexHash);
     }
@@ -259,7 +259,6 @@ public class GitHelper {
                         projectInfoFile);
                 List<MerkleNode> add = ipfs.add(file);
                 hashMap.put(entry.getKey(), new Two(add.get(add.size() - 1).hash.toBase58(), sha1(entry.getValue())));
-                System.out.println(entry.getKey() + "==" + add.get(add.size() - 1).hash.toBase58());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -410,6 +409,7 @@ public class GitHelper {
                     if (address == null) {
                         throw new RuntimeException("Can't not create contract for project!");
                     }
+                    System.out.println("Repository contract is created on address:" + address);
                     info.setRepoAddress(address);
                     info.setOwner(getProjectOwner(projectDir));
                     info.setOwnerPubKeyRsa(rootPubKeyRsa);
