@@ -128,12 +128,12 @@ public class HitIPFSStorage {
      * @throws IOException
      */
     public byte[] get(String filePath) throws IOException {
-        System.out.println("get filename:" + filePath);
+        //System.out.println("get filename:" + filePath);
         Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get(filePath);
         if (ipfsHashAndSha1 == null || StringUtils.isBlank(ipfsHashAndSha1.first())) {
             throw new FileNotFoundException("File not found: " + filePath);
         }
-        System.out.println("get filename:" + filePath + ", ipfs:" + ipfsHashAndSha1.first() + ", sha1:" + ipfsHashAndSha1.second());
+        //System.out.println("get filename:" + filePath + ", ipfs:" + ipfsHashAndSha1.first() + ", sha1:" + ipfsHashAndSha1.second());
         byte[] content = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
         //System.out.println("file content:" + new String(content));
         DecryptableFileWrapper file = new DecryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(content)), projectInfoFile, "root", GitHelper.rootPriKeyRsa);
@@ -159,7 +159,7 @@ public class HitIPFSStorage {
      * @return ipfs hash.
      */
     public String put(String filePath, byte[] data) {
-        System.out.println("Put file:" + filePath + "...");
+        System.out.println("Uploading file:" + filePath + "...");
         try {
             ByteArrayInputStream is = new ByteArrayInputStream(data);
             EncryptableFileWrapper file = new EncryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(is)), projectInfoFile);
@@ -171,7 +171,7 @@ public class HitIPFSStorage {
                 }
                 uploadedGitFileIndex.put(filePath, new Two(ipfsHash, GitHelper.sha1(data)));
             }
-            System.out.println("Put file:" + filePath + ", ipfs:" + ipfsHash);
+            System.out.println("Uploaded file:" + filePath + ", ipfs:" + ipfsHash);
             return ipfsHash;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -188,7 +188,7 @@ public class HitIPFSStorage {
      * @throws IOException
      */
     public OutputStream beginPut(String filePath, ProgressMonitor monitor, String monitorTask) throws IOException {
-        System.out.println("BeginPut file:" + filePath + "...");
+        //System.out.println("BeginPut file:" + filePath + "...");
         ByteArrayOutputStream os = new ByteArrayOutputStream() {
             public void close() throws IOException {
                 onBeginPutClose(filePath, monitor, monitorTask, toByteArray());
