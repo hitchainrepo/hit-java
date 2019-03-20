@@ -167,9 +167,9 @@ public class TransportHit extends HttpTransport implements WalkTransport {
             }
         }
         uploadedGitFileIndex = hit.getUploadedGitFileIndex();
-        for (Map.Entry<String, Two<Object, String, String>> entry : uploadedGitFileIndex.entrySet()) {
-            System.out.println("Upload:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:" + entry.getValue().second());
-        }
+        //for (Map.Entry<String, Two<Object, String, String>> entry : uploadedGitFileIndex.entrySet()) {
+        //    System.out.println("Upload:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:" + entry.getValue().second());
+        //}
         GitHelper.updateHitRepositoryGitFileIndex(projectDir, hit.getProjectInfoFile(), gitFileIndex, uploadedGitFileIndex);
     }
 
@@ -188,7 +188,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
                 System.out.println("Update " + GitHelper.HIT_PROJECT_INFO);
             }
         } catch (Exception e) {
-            throw new RuntimeException("Can not download hit file.");
+            throw new RuntimeException("Can not download hit file.", e);
         }
     }
 
