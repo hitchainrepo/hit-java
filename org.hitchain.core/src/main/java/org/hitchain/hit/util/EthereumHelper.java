@@ -116,7 +116,7 @@ public class EthereumHelper {
     public static String createContractForProject(String urlBase, String ownerAddressEcc, String projectName) {
         ///====create
         String url = urlBase + "/api/web3j/deployRepositoryNameContract";
-        String content = "PrivateKey=-\nGasLimit=5000000\nGwei=0\n";
+        String content = "PrivateKey=-\nGasLimit=5000000\nGwei=1\n";
         String address = post(url, content);
         if (isError(address)) {
             for (int i = 0; i < 10; i++) {
@@ -131,8 +131,8 @@ public class EthereumHelper {
         }
         //====init
         url = urlBase + "/api/web3j/writeRepositoryNameContract";
-        content = "PrivateKey=-\n" + "ContractAddress=" + address + "\n" + "FunctionName=init(addr,repoName)\n"
-                + "Arg1=" + ownerAddressEcc + "\n" + "Arg2=" + projectName + "\n" + "GasLimit=5000000\n" + "Gwei=0\n";
+        content = "PrivateKey=-\n" + "ContractAddress=" + address + "\n" + "FunctionName=initWithDelegator(addr,repoName,delegator)\n"
+                + "Arg1=" + ownerAddressEcc + "\n" + "Arg2=" + projectName + "\n" + "Arg3=-\n" + "GasLimit=5000000\n" + "Gwei=10\n";
         String init = post(url, content);
         if (isError(init)) {
             for (int i = 0; i < 10; i++) {
@@ -155,9 +155,9 @@ public class EthereumHelper {
             String oldProjectAddress = StringUtils.isBlank(projectAddress) ? "-" : projectAddress;
             //
             String url = urlBase + "/api/web3j/writeRepositoryNameContract";
-            String content = "PrivateKey=" + ownerPriKeyEcc + "\n" + "ContractAddress=" + contractAddressddress + "\n"
+            String content = "PrivateKey=-\n" + "ContractAddress=" + contractAddressddress + "\n"
                     + "FunctionName=updateRepositoryAddress(oldAddr,newAddr)\n" + "Arg1=" + oldProjectAddress + "\n"
-                    + "Arg2=" + newProjectHash + "\n" + "GasLimit=5000000\n" + "Gwei=0\n";
+                    + "Arg2=" + newProjectHash + "\nArg3=-\n" + "GasLimit=5000000\n" + "Gwei=10\n";
             result = post(url, content);
             if (!isError(result)) {
                 return;
