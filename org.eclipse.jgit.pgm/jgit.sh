@@ -110,9 +110,11 @@ then
 	LESS=${LESS:-FSRX}
 	export LESS
 
-	"$java" $java_args org.eclipse.jgit.pgm.Main "$@" | $use_pager
+	#/*add by hit*/"$java" $java_args org.eclipse.jgit.pgm.Main "$@" | $use_pager/*end of add*/
+	"$java" $java_args org.hitchain.core.Main "$@" | $use_pager
 	exit
 else
-  exec "$java" $java_args org.eclipse.jgit.pgm.Main "$@"
+  #/*add by hit*/exec "$java" $java_args org.eclipse.jgit.pgm.Main "$@"/*end of add*/
+  exec "$java" $java_args org.hitchain.core.Main "$@"
   exit 1
 fi
