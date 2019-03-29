@@ -22,6 +22,7 @@ import org.hitchain.hit.api.HashedFile;
 import org.hitchain.hit.api.ProjectInfoFile;
 import org.hitchain.hit.util.EthereumHelper;
 import org.hitchain.hit.util.GitHelper;
+import org.hitchain.hit.util.HitHelper;
 import org.hitchain.hit.util.Tuple.Two;
 
 import java.io.*;
@@ -55,7 +56,7 @@ public class HitIPFSStorage {
             String path = uri.getRawPath();
             if (StringUtils.isBlank(path)) {
                 path = host;
-                host = GitHelper.URL_ETHER;
+                host = HitHelper.getRepository();
             } else {
                 host = "https://" + host;
             }
@@ -136,7 +137,7 @@ public class HitIPFSStorage {
         //System.out.println("get filename:" + filePath + ", ipfs:" + ipfsHashAndSha1.first() + ", sha1:" + ipfsHashAndSha1.second());
         byte[] content = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
         //System.out.println("file content:" + new String(content));
-        DecryptableFileWrapper file = new DecryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(content)), projectInfoFile, "root", GitHelper.rootPriKeyRsa);
+        DecryptableFileWrapper file = new DecryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(content)), projectInfoFile, "root", HitHelper.getRsaPriKeyWithPasswordInput());
         return file.getContents();
     }
 

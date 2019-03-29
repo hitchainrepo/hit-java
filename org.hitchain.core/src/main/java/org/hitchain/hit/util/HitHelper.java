@@ -4,6 +4,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.BufferedReader;
+import java.io.Console;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.util.LinkedHashMap;
@@ -139,6 +140,11 @@ public class HitHelper {
             return null;
         }
         if (TYPE_account.equals(section) || TYPE_rsa.equals(section)) {
+            if (NAME_default.equals(name)) {
+                Tuple.Two<String, String, String> two = new Tuple.Two<>(kv.get(name), null);
+                two.result(kv.get(NAME_default));
+                return two;
+            }
             String pub = name + "_pub";
             String pri = name + "_pri";
             if (!(kv.containsKey(pub) && kv.containsKey(pri))) {
@@ -182,7 +188,7 @@ public class HitHelper {
                 System.out.println("Hit config " + section + " " + name + " is exists!");
                 return false;
             }
-            if (kv.isEmpty()) {
+            if (StringUtils.isBlank(kv.get(NAME_default))) {
                 kv.put(NAME_default, name);
             }
             kv.put(pub, value1);
@@ -198,7 +204,7 @@ public class HitHelper {
                 System.out.println("Hit config " + section + " " + name + " is exists!");
                 return false;
             }
-            if (kv.isEmpty()) {
+            if (StringUtils.isBlank(kv.get(NAME_default))) {
                 kv.put(NAME_default, name);
             }
             kv.put(name, value1);
@@ -517,15 +523,6 @@ public class HitHelper {
         return hitConfig == null ? hitConfig() : hitConfig;
     }
 
-    public static String getAccountPublicKey() {
-        Tuple.Two<String, String, String> two = getByName(getHitConfig(), TYPE_account, NAME_default);
-        if (two == null || StringUtils.isBlank(two.first())) {
-            return null;
-        }
-        Tuple.Two<String, String, String> account = getByName(getHitConfig(), TYPE_account, two.first());
-        return account == null ? null : account.first();
-    }
-
     public static Tuple.Two<String, String, String> getDefaultValue(String section) {
         Tuple.Two<String, String, String> two = getByName(getHitConfig(), section, NAME_default);
         if (two == null || StringUtils.isBlank(two.first())) {
@@ -609,6 +606,10 @@ public class HitHelper {
         return two == null ? null : two.first();
     }
 
+    public static String getAccountAddress() {
+        return getAccountPubKey();
+    }
+
     public static String getAccountPriKey(String password) {
         Tuple.Two<String, String, String> two = getAccount(password);
         return two == null ? null : two.second();
@@ -676,15 +677,32 @@ public class HitHelper {
             return WalletHelper.decryptWithPasswordHex(passwordCache, passwordEncrypt);
         }
         String password = "";
-        for (int i = 0; i < 3; i++) {
-            System.out.println("Input hit config password:");
-            password = readFromSystemInput();
-            if (testHitConfigPassword(password, false)) {
-                break;
+        Console console = System.console();
+        if (console == null) {
+            System.err.println("Couldn't get Console instance, password input will show in console!");
+        }
+        if (console != null) {
+            for (int i = 0; i < 3; i++) {
+                char passwordArray[] = console.readPassword("Enter hit config password: ");
+                password = new String(passwordArray);
+                if (testHitConfigPassword(password, false)) {
+                    break;
+                }
+                System.err.println("Password is incorrect, try again!");
             }
-            System.out.println("Password is incorrect, try again:");
+        } else {
+            for (int i = 0; i < 3; i++) {
+                System.err.println("Enter hit config password:");
+                password = readFromSystemInput();
+                if (testHitConfigPassword(password, false)) {
+                    break;
+                }
+                System.err.println("Password is incorrect, try again!");
+            }
         }
         if (StringUtils.isBlank(password)) {
+            System.err.println("Password is incorrect!");
+            System.exit(0);
             return null;
         }
         {

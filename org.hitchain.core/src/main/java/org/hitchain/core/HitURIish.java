@@ -16,6 +16,7 @@ import org.hitchain.hit.api.HashedFile;
 import org.hitchain.hit.api.ProjectInfoFile;
 import org.hitchain.hit.util.EthereumHelper;
 import org.hitchain.hit.util.GitHelper;
+import org.hitchain.hit.util.HitHelper;
 import org.hitchain.hit.util.Tuple;
 
 import java.io.ByteArrayInputStream;
@@ -59,7 +60,7 @@ public class HitURIish extends URIish {
             String path = getRawPath();
             if (StringUtils.isBlank(path)) {
                 path = host;
-                host = GitHelper.URL_ETHER;
+                host = HitHelper.getRepository();
             } else {
                 host = "https://" + host;
             }

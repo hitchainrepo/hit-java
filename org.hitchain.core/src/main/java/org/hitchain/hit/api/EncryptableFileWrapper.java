@@ -10,6 +10,7 @@ package org.hitchain.hit.api;
 
 import io.ipfs.api.NamedStreamable;
 import org.hitchain.hit.util.ECCHelper;
+import org.hitchain.hit.util.RSAHelper;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;

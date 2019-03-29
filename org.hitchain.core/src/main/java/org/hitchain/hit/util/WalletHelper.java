@@ -173,7 +173,7 @@ public class WalletHelper {
      */
     public static Tuple.Two<Object, String, String> createAccount(String password) {
         ECKey key = new ECKey();
-        String publicKey = toHex(key.getPubKey());
+        String publicKey = "0x" + toHex(key.getAddress());
         String privateKey = encryptWithPasswordHex(toHex(key.getPrivKeyBytes()), password);
         Tuple.Two<Object, String, String> two = new Tuple.Two<>(publicKey, privateKey);
         return two;
@@ -188,7 +188,7 @@ public class WalletHelper {
     public static Tuple.Two<Object, String, String> createExistsAccount(String password, String priHex) {
         try {
             ECKey key = ECKey.fromPrivate(fromHex(priHex));
-            String publicKey = toHex(key.getPubKey());
+            String publicKey = "0x" + toHex(key.getAddress());
             String privateKey = encryptWithPasswordHex(toHex(key.getPrivKeyBytes()), password);
             Tuple.Two<Object, String, String> two = new Tuple.Two<>(publicKey, privateKey);
             return two;

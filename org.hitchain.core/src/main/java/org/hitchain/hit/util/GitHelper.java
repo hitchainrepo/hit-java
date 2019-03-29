@@ -38,8 +38,8 @@ import java.util.zip.GZIPOutputStream;
  */
 public class GitHelper {
 
-    public static final String URL_IPFS = System.getProperty("URL_IPFS", "121.40.127.45"/*"http://121.40.127.45"*/);
-    public static final String URL_ETHER = System.getProperty("URL_ETHER", "https://121.40.127.45:1443");
+    //public static final String URL_IPFS = System.getProperty("URL_IPFS", "121.40.127.45"/*"http://121.40.127.45"*/);
+    //public static final String URL_ETHER = System.getProperty("URL_ETHER", "https://121.40.127.45:1443");
     //public static final String rootPubKeyEcc = "0x837a4bbef0f7235b8fdb03c55d0d98f27f49cda8";
     //public static final String rootPriKeyEcc = "448b60044aec0065a08115d7af1038491830f697c36118e046e38cf7002ee45b";
     //public static final String rootPubKeyRsa = "30819f300d06092a864886f70d010101050003818d0030818902818100df6c814a1b827317370607e207a8749f12497d4ea339cd4f4a38df3690c9d24eb279852780105ed4f7a493833b0ed27409b74eb58b1a452a66be052146ee1f5fb0fa42231221f22cd73e70026b606862b91365fdbe6b2af79838eaa38db60dddc01ecf78f6881880ad399e65747fe86f5e844f5cd4b40f6de8c3e8e60db343290203010001";
@@ -99,7 +99,7 @@ public class GitHelper {
         }
         //#7.Write the new GitFileIndex to disk and ipfs.
         String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, newGitFileIndex);
-        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + URL_IPFS + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
+        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
         //#8.Call contract and update project hash(GitFileIndex hash).
         updateProjectAddress(projectInfoFile, gitFileIndexHash);
     }
@@ -111,7 +111,7 @@ public class GitHelper {
         combine.putAll(upload);
         //#7.Write the new GitFileIndex to disk and ipfs.
         String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, combine);
-        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + URL_IPFS + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
+        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
         //#8.Call contract and update project hash(GitFileIndex hash).
         updateProjectAddress(projectInfoFile, gitFileIndexHash);
     }
@@ -167,13 +167,13 @@ public class GitHelper {
         }
         //#7.Write the new GitFileIndex to disk and ipfs.
         String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, newGitFileIndex);
-        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + URL_IPFS + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
+        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
         //#8.Call contract and update project hash(GitFileIndex hash).
         updateProjectAddress(projectInfoFile, gitFileIndexHash);
     }
 
     private static void updateProjectAddress(ProjectInfoFile projectInfoFile, String newProjectAddress) {
-        EthereumHelper.updateProjectAddress(URL_ETHER, projectInfoFile.getRepoAddress(), EthereumHelper.encryptPriKeyEcc(URL_ETHER, HitHelper.getAccountPriKeyWithPasswordInput()), newProjectAddress);
+        EthereumHelper.updateProjectAddress(HitHelper.getRepository(), projectInfoFile.getRepoAddress(), EthereumHelper.encryptPriKeyEcc(HitHelper.getRepository(), HitHelper.getAccountPriKeyWithPasswordInput()), newProjectAddress);
     }
 
     private static String writeGitFileIndexToIpfs(File projectDir, Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileHash) {
@@ -225,7 +225,7 @@ public class GitHelper {
     }
 
     public static IPFS getIpfs() {
-        String urlIpfs = URL_IPFS;
+        String urlIpfs = HitHelper.getStorage();
         IPFS ipfs = new IPFS(urlIpfs, 5001, "/api/v0/", false);
         return ipfs;
     }
@@ -386,13 +386,13 @@ public class GitHelper {
                 ProjectInfoFile info = new ProjectInfoFile();
                 {
                     info.setVersion("1");
-                    info.setEthereumUrl(URL_ETHER);
-                    info.setFileServerUrl(URL_IPFS);
+                    info.setEthereumUrl(HitHelper.getRepository());
+                    info.setFileServerUrl(HitHelper.getStorage());
                     info.setRepoName(getProjectName(projectDir));
                     ECKey repoKeyPair = new ECKey();
                     //info.setRepoPubKey(Hex.toHexString(repoKeyPair.getPubKey()));
                     //info.setRepoPriKey(Hex.toHexString(RSAHelper.encrypt(repoKeyPair.getPrivKeyBytes(), RSAHelper.getPublicKeyFromHex(rootPubKeyRsa))));
-                    String address = EthereumHelper.createContractForProject(URL_ETHER, HitHelper.getAccountPubKey(), info.getRepoName());
+                    String address = EthereumHelper.createContractForProject(HitHelper.getRepository(), HitHelper.getAccountPubKey(), info.getRepoName());
                     if (address == null) {
                         throw new RuntimeException("Can't not create contract for project!");
                     }

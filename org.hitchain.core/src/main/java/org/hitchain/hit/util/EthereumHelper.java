@@ -147,8 +147,7 @@ public class EthereumHelper {
         return null;
     }
 
-    public static void updateProjectAddress(String urlBase, String contractAddressddress, String ownerPriKeyEcc,
-                                            String newProjectHash) {
+    public static void updateProjectAddress(String urlBase, String contractAddressddress, String ownerPriKeyEcc, String newProjectHash) {
         String result = "";
         for (int i = 0; i < 10; i++) {
             String projectAddress = getProjectAddress(urlBase, contractAddressddress);
