@@ -57,6 +57,7 @@ import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.util.SystemReader;
+import org.hitchain.core.HitURIish;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
@@ -98,7 +99,7 @@ class Clone extends AbstractFetchCommand implements CloneCommand.Callback {
 		if (localName != null && gitdir != null)
 			throw die(CLIText.get().conflictingUsageOf_git_dir_andArguments);
 
-		final URIish uri = new URIish(sourceUri);
+		final URIish uri = /*add by hit*/new HitURIish(sourceUri)/*-new URIish(sourceUri)*//*end of add*/;
 		File localNameF;
 		if (localName == null) {
 			try {
