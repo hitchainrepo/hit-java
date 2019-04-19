@@ -104,6 +104,31 @@ public class GitHelper {
         updateProjectAddress(projectInfoFile, gitFileIndexHash);
     }
 
+    public static boolean updateHitRepositoryProjectInfoFile(File projectDir, ProjectInfoFile projectInfoFile) {
+        Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> combine = readGitFileIndexFromLocal(projectDir);
+        //#1. write project info file to disk.
+        String content = projectInfoFile.genSignedContent(HitHelper.getRsaPriKeyWithPasswordInput());
+        writeUpdateFile(new File(projectDir, HIT_PROJECT_INFO), ByteHelper.utf8(content));
+        Map<String, File> newGitFile = new HashMap<>();
+        {
+            newGitFile.put(HIT_PROJECT_INFO, new File(projectDir, HIT_PROJECT_INFO));
+        }
+        Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> twoMap = writeNewFileToIpfs(newGitFile, projectInfoFile, getIpfs());
+        Two<Object, String/* ipfs hash */, String/* sha1 */> two = twoMap.isEmpty() || twoMap.values().isEmpty() ? null : twoMap.values().iterator().next();
+        if (two == null && StringUtils.isNotBlank(two.first())) {
+            return false;
+        }
+        //#2.Write the new GitFileIndex to disk and ipfs.
+        {
+            combine.put(HIT_PROJECT_INFO, two);
+        }
+        String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, combine);
+        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
+        //#3.Call contract and update project hash(GitFileIndex hash).
+        updateProjectAddress(projectInfoFile, gitFileIndexHash);
+        return true;
+    }
+
     public static void updateHitRepositoryGitFileIndex(File projectDir, ProjectInfoFile projectInfoFile, Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> old, Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> upload) {
         //#6.Gen the new GitFileIndex.
         Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> combine = new LinkedHashMap<>();
