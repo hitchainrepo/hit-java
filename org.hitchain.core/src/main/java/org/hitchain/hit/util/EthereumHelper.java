@@ -34,6 +34,28 @@ import java.security.cert.CertificateException;
 
 /**
  * Utils
+ * <pre>
+ * /api/web3j/readRepositoryNameContract
+ * 读取RepositoryName合约
+ * 数据格式(数据间请勿输入空格，Arg是输入的参数，为空时设值为-，出错时返回’ERROR:’开头的错误信息)：
+ * FromAddress=
+ * ContractAddress=
+ * FunctionName=repositoryName|repositoryAddress|owner|delegator|authedAccounts(addr)|authedAccountList(int)|authedAccountSize|hasTeamMember(addr)|teamMemberAtIndex(int)
+ * Arg=-
+ * </pre>
+ * <pre>
+ * /api/web3j/writeRepositoryNameContract
+ * 写RepositoryName合约
+ * 数据格式(数据间请勿输入空格，PrivateKey需要先加密采用默认值时为-，Arg是输入的参数，为空时设值为-，出错时返回’ERROR:’开头的错误信息)：
+ * PrivateKey=
+ * ContractAddress=
+ * FunctionName=init(addr,repoName)|initWithDelegator(addr,repoName,delegator)|updateRepositoryName(repoName)|updateRepositoryAddress(oldAddr,newAddr)|addTeamMember(addr)|removeTeamMember(addr)|changeOwner(addr)|delegateTo(addr)
+ * Arg1=-
+ * Arg2=-
+ * Arg3=-
+ * GasLimit=5000000
+ * Gwei=0
+ * </pre>
  *
  * @author <a href="mailto:iffiff1@gmail.com">Tyler Chen</a>
  * @since 2018-12-17
@@ -147,14 +169,14 @@ public class EthereumHelper {
         return null;
     }
 
-    public static void updateProjectAddress(String urlBase, String contractAddressddress, String ownerPriKeyEcc, String newProjectHash) {
+    public static void updateProjectAddress(String urlBase, String contractAddress, String ownerPriKeyEcc, String newProjectHash) {
         String result = "";
         for (int i = 0; i < 10; i++) {
-            String projectAddress = getProjectAddress(urlBase, contractAddressddress);
+            String projectAddress = getProjectAddress(urlBase, contractAddress);
             String oldProjectAddress = StringUtils.isBlank(projectAddress) ? "-" : projectAddress;
             //
             String url = urlBase + "/api/web3j/writeRepositoryNameContract";
-            String content = "PrivateKey=-\n" + "ContractAddress=" + contractAddressddress + "\n"
+            String content = "PrivateKey=-\n" + "ContractAddress=" + contractAddress + "\n"
                     + "FunctionName=updateRepositoryAddress(oldAddr,newAddr)\n" + "Arg1=" + oldProjectAddress + "\n"
                     + "Arg2=" + newProjectHash + "\nArg3=-\n" + "GasLimit=5000000\n" + "Gwei=10\n";
             result = post(url, content);
@@ -176,6 +198,31 @@ public class EthereumHelper {
         String content = "PrivateKey=" + priKeyEcc + "\n";
         String encrypt = post(url, content);
         return isError(encrypt) ? null : encrypt;
+    }
+
+    public static boolean hasTeamMember(String urlBase, String contractAddress, String memberAddress) {
+        String url = urlBase + "/api/web3j/readRepositoryNameContract";
+        String content = "FromAddress=-\nContractAddress=" + contractAddress + "\nFunctionName=hasTeamMember\nArg=" + memberAddress + "\n";
+        String post = post(url, content);
+        return StringUtils.equals(post, "true");
+    }
+
+    public static String addTeamMember(String urlBase, String contractAddress, String memberAddress) {
+        String url = urlBase + "/api/web3j/writeRepositoryNameContract";
+        String content = "PrivateKey=-\n" + "ContractAddress=" + contractAddress + "\n"
+                + "FunctionName=addTeamMember(addr)\n" + "Arg1=" + memberAddress + "\n"
+                + "Arg2=-\nArg3=-\n" + "GasLimit=500000\n" + "Gwei=10\n";
+        String post = post(url, content);
+        return post;
+    }
+
+    public static String removeTeamMember(String urlBase, String contractAddress, String memberAddress) {
+        String url = urlBase + "/api/web3j/writeRepositoryNameContract";
+        String content = "PrivateKey=-\n" + "ContractAddress=" + contractAddress + "\n"
+                + "FunctionName=removeTeamMember(addr)\n" + "Arg1=" + memberAddress + "\n"
+                + "Arg2=-\nArg3=-\n" + "GasLimit=500000\n" + "Gwei=10\n";
+        String post = post(url, content);
+        return post;
     }
 
     public static boolean isError(String result) {
