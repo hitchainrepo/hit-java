@@ -160,6 +160,7 @@ public class ProjectInfoFile implements Serializable {
         }
         ProjectInfoFile infoFile = JsonHelper.toObject(ProjectInfoFile.class, content);
         infoFile.setSign(sign);
+        infoFile.setContent(content);
         infoFile.setFile(file);
         return infoFile;
     }
