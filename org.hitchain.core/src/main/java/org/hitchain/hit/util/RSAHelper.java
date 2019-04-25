@@ -408,5 +408,12 @@ public class RSAHelper {
         System.out.println("============");
         byte[] sign = sign(largeText, getPrivateKeyFromBase64(priKey));
         System.out.println("Verify:" + verify(largeText, sign, getPublicKeyFromBase64(pubKey)));
+        {
+            ECKey key = new ECKey();
+            KeyPair keyPair = ECCHelper.getKeyPair();
+            System.out.println("private-length=" + key.getPrivKeyBytes().length);
+            System.out.println("public-length=" + key.getPubKey().length);
+            byte[] encrypt1 = encrypt(key.getPrivKeyBytes(), kp.getPublic());
+        }
     }
 }

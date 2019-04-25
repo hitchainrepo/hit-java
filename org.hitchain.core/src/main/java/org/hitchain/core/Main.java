@@ -8,14 +8,14 @@
 package org.hitchain.core;
 
 import org.apache.commons.lang3.StringUtils;
+import org.bouncycastle.util.encoders.Hex;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.Repository;
 import org.hitchain.hit.api.ProjectInfoFile;
-import org.hitchain.hit.util.EthereumHelper;
-import org.hitchain.hit.util.GitHelper;
-import org.hitchain.hit.util.HitHelper;
+import org.hitchain.hit.util.*;
 
 import java.io.File;
+import java.security.KeyPair;
 import java.util.Arrays;
 import java.util.LinkedList;
 
@@ -59,6 +59,8 @@ import java.util.LinkedList;
  */
 public class Main {
     public static void main(String[] args) throws Exception {
+        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/hello");
+        args = new String[]{"repo", "keypair", "add"};
         if (args != null && args.length > 0 && "cfg".equals(args[0])) {
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
@@ -190,9 +192,6 @@ public class Main {
                 String workDir = System.getProperty("git_work_tree");
                 if (workDir == null) {
                     workDir = ".";
-                    System.out.println(
-                            "System property 'git_work_tree' not specified, using current directory: "
-                                    + new File(workDir).getAbsolutePath());
                 }
                 projectDir = new File(workDir + "/.git");
             }
@@ -207,7 +206,7 @@ public class Main {
                     // list all members
                     return;
                 }
-                String type = list.poll();//member
+                String type = list.poll();//member, keypair
                 String operation = list.poll();//add, remove
                 String member = list.poll();//团队成员Email
                 String memberPubKeyRsa = list.poll();//成员的RSA公钥
@@ -223,12 +222,86 @@ public class Main {
                 }
                 ProjectInfoFile projectInfoFile = getProjectInfoFile(projectDir);
                 if (HitHelper.TYPE_member.equals(type)) {
-                    if ("add".equals(operation)) {
+                    if (HitHelper.ACTION_add.equals(operation)) {
                         addMember(projectDir, member, memberPubKeyRsa, memberAddressEcc, projectInfoFile);
                         return;
                     }
-                    if ("remove".equals(operation)) {
+                    if (HitHelper.ACTION_remove.equals(operation)) {
                         if (removeMember(projectDir, member, memberAddressEcc, projectInfoFile)) return;
+                        return;
+                    }
+                    {// print team member info.
+                        printMemberInfo(projectInfoFile);
+                    }
+                    return;
+                }
+                if (HitHelper.TYPE_keypair.equals(type)) {
+                    if (HitHelper.ACTION_add.equals(operation)) {
+                        if (projectInfoFile.isPrivate()) {
+                            System.out.println("Repository already has keypair.");
+                            return;
+                        }
+                        ECKey key = new ECKey();
+                        String publicKey = Hex.toHexString(key.getPubKey());
+                        System.out.println("publicKey="+publicKey);
+                        String privateKey = Hex.toHexString(key.getPrivKeyBytes());
+                        System.out.println("privateKey="+privateKey);
+                        // Encrypt: private key -(hex decode)-> private key bytes -(encrypt with rsa public key)->  encrypt bytes -(hex encode)-> hex encrypt
+                        // Decrypt: hex encrypt -(hex decode)-> encrypt bytes     -(decrypt with rsa private key)-> private key bytes -(hex encode) private key
+                        String privateKeyEncryptByOwnerRsaPubKey = Hex.toHexString(
+                                RSAHelper.encrypt(
+                                        Hex.decode(privateKey),
+                                        RSAHelper.getPublicKeyFromHex(HitHelper.getRsaPubKey())
+                                ));
+                        System.out.println("privateKeyEncryptByOwnerRsaPubKey="+privateKeyEncryptByOwnerRsaPubKey);
+                        projectInfoFile.setRepoPubKey(publicKey);
+                        projectInfoFile.setRepoPriKey(privateKeyEncryptByOwnerRsaPubKey);
+                        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
+                            String memberPubKey = ti.getMemberPubKeyRsa();
+                            String privateKeyEncryptByMemberRsaPubKey = RSAHelper.encrypt(privateKey, RSAHelper.getPublicKeyFromHex(memberPubKey));
+                            ti.setMemberRepoPriKey(privateKeyEncryptByMemberRsaPubKey);
+                        }
+                        {
+                            System.out.println("getPublicKeyFromEthereumPublicKeyHex="+ECCHelper.getPublicKeyFromEthereumPublicKeyHex(projectInfoFile.getRepoPubKey()));
+                        }
+                        GitHelper.updateWholeHitRepository(projectDir, projectInfoFile);
+                        System.out.println("Repository keypair has updated.");
+                        return;
+                    }
+                    if (HitHelper.ACTION_remove.equals(operation)) {
+                        if (!projectInfoFile.isPrivate()) {
+                            System.out.println("Repository is public without keypair.");
+                            return;
+                        }
+                        projectInfoFile.setRepoPubKey(null);
+                        projectInfoFile.setRepoPriKey(null);
+                        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
+                            ti.setMemberRepoPriKey(null);
+                        }
+                        GitHelper.updateWholeHitRepository(projectDir, projectInfoFile);
+                        System.out.println("Repository keypair has removed.");
+                        return;
+                    }
+                    if (HitHelper.ACTION_renew.equals(operation)) {
+                        ECKey key = new ECKey();
+                        String publicKey = Hex.toHexString(key.getPubKey());
+                        System.out.println("publicKey="+publicKey);
+                        String privateKey = Hex.toHexString(key.getPrivKeyBytes());
+                        System.out.println("privateKey="+privateKey);
+                        String privateKeyEncryptByOwnerRsaPubKey = Hex.toHexString(
+                                RSAHelper.encrypt(
+                                        Hex.decode(privateKey),
+                                        RSAHelper.getPublicKeyFromHex(HitHelper.getRsaPubKey())
+                                ));
+                        projectInfoFile.setRepoPubKey(publicKey);
+                        projectInfoFile.setRepoPriKey(privateKeyEncryptByOwnerRsaPubKey);
+                        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
+                            String memberPubKey = ti.getMemberPubKeyRsa();
+                            String privateKeyEncryptByMemberRsaPubKey = RSAHelper.encrypt(privateKey, RSAHelper.getPublicKeyFromHex(memberPubKey));
+                            ti.setMemberRepoPriKey(privateKeyEncryptByMemberRsaPubKey);
+                        }
+                        GitHelper.updateWholeHitRepository(projectDir, projectInfoFile);
+                        System.out.println("Repository keypair has renewed.");
                         return;
                     }
                     {// print team member info.
@@ -277,7 +350,7 @@ public class Main {
             System.exit(1);
         }
         System.out.println("Member has removed in the contract.");
-        return false;
+        return true;
     }
 
     private static void addMember(File projectDir, String member, String memberPubKeyRsa, String memberAddressEcc, ProjectInfoFile projectInfoFile) {
@@ -327,7 +400,7 @@ public class Main {
             System.exit(1);
         }
         if (!projectInfoFile.verify(null)) {
-            System.err.println("Only owner can change this settings.");
+            System.err.println("Project info file is not verify.");
             System.exit(1);
         }
         return projectInfoFile;
