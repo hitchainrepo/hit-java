@@ -9,14 +9,11 @@
 package org.hitchain.hit.api;
 
 import io.ipfs.api.NamedStreamable;
+import org.apache.commons.io.IOUtils;
 import org.hitchain.hit.util.ECCHelper;
-import org.hitchain.hit.util.RSAHelper;
+import org.hitchain.hit.util.GitHelper;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.URLEncoder;
 import java.security.PublicKey;
 import java.util.ArrayList;
@@ -32,58 +29,65 @@ import java.util.Optional;
  * auto generate by qdp.
  */
 public class EncryptableFileWrapper implements NamedStreamable {
-	private final HashedFile source;
-	private final ProjectInfoFile projectInfoFile;
+    private final HashedFile source;
+    private final ProjectInfoFile projectInfoFile;
 
-	public EncryptableFileWrapper(HashedFile source, ProjectInfoFile projectInfoFile) {
-		if (source == null) {
-			throw new IllegalStateException("EncryptableFileWrapper HashedFile does not exist: " + source);
-		} else {
-			this.source = source;
-		}
-		if (projectInfoFile == null) {
-			throw new IllegalStateException(
-					"EncryptableFileWrapper ProjectInfoFile does not exist: " + projectInfoFile);
-		} else {
-			this.projectInfoFile = projectInfoFile;
-		}
-	}
+    public EncryptableFileWrapper(HashedFile source, ProjectInfoFile projectInfoFile) {
+        if (source == null) {
+            throw new IllegalStateException("EncryptableFileWrapper HashedFile does not exist: " + source);
+        } else {
+            this.source = source;
+        }
+        if (projectInfoFile == null) {
+            throw new IllegalStateException(
+                    "EncryptableFileWrapper ProjectInfoFile does not exist: " + projectInfoFile);
+        } else {
+            this.projectInfoFile = projectInfoFile;
+        }
+    }
 
-	public InputStream getInputStream() throws IOException {
-		if (projectInfoFile.isPrivate()) {
-			try {
-				PublicKey publicKey = ECCHelper.getPublicKeyFromEthereumPublicKeyHex(projectInfoFile.getRepoPubKey());
-				InputStream is = source.getInputStream();
-				byte[] bytes = ECCHelper.publicEncrypt(is, publicKey);
-				return new ByteArrayInputStream(bytes);
-			} catch (Exception e) {
-				throw new IOException(e);
-			}
-		}
-		return source.getInputStream();
-	}
+    public byte[] getContents() throws IOException {
+        return IOUtils.toByteArray(getInputStream());
+    }
 
-	public boolean isDirectory() {
-		return this.source.isDirectory();
-	}
+    public InputStream getInputStream() throws IOException {
+        byte[] bs = source.getContents();
+        if (GitHelper.HIT_PROJECT_INFO.equals(source.getName()) || GitHelper.HIT_GITFILE_IDX.equals(source.getName()) || !projectInfoFile.isPrivate()) {
+            return new ByteArrayInputStream(bs);
+        }
+        try {
+            // Encrypt: use repository public key to encrypt the file.
+            // Decrypt: decrypt repository private key by user rsa private key and then decrypt the file.
+            PublicKey publicKey = ECCHelper.getPublicKeyFromEthereumPublicKeyHex(projectInfoFile.getRepoPubKey());
+            byte[] bytes = ECCHelper.publicEncrypt(bs, publicKey);
+            return new ByteArrayInputStream(bytes);
+        } catch (Exception e) {
+            throw new IOException(e);
+        }
 
-	public List<NamedStreamable> getChildren() {
-		if (source.isDirectory()) {
-			List<HashedFile> children = source.getChildren();
-			List<NamedStreamable> list = new ArrayList<>();
-			for (HashedFile hf : children) {
-				list.add(new EncryptableFileWrapper(hf, projectInfoFile));
-			}
-			return list;
-		}
-		return Collections.emptyList();
-	}
+    }
 
-	public Optional<String> getName() {
-		try {
-			return Optional.of(URLEncoder.encode(new File(this.source.getName()).getName(), "UTF-8"));
-		} catch (UnsupportedEncodingException var2) {
-			throw new RuntimeException(var2);
-		}
-	}
+    public boolean isDirectory() {
+        return this.source.isDirectory();
+    }
+
+    public List<NamedStreamable> getChildren() {
+        if (source.isDirectory()) {
+            List<HashedFile> children = source.getChildren();
+            List<NamedStreamable> list = new ArrayList<>();
+            for (HashedFile hf : children) {
+                list.add(new EncryptableFileWrapper(hf, projectInfoFile));
+            }
+            return list;
+        }
+        return Collections.emptyList();
+    }
+
+    public Optional<String> getName() {
+        try {
+            return Optional.of(URLEncoder.encode(new File(this.source.getName()).getName(), "UTF-8"));
+        } catch (UnsupportedEncodingException var2) {
+            throw new RuntimeException(var2);
+        }
+    }
 }
