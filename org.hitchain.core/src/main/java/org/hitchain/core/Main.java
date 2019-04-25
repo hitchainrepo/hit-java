@@ -59,8 +59,8 @@ import java.util.LinkedList;
  */
 public class Main {
     public static void main(String[] args) throws Exception {
-        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/hello");
-        args = new String[]{"repo", "keypair", "add"};
+        //System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/hello");
+        //args = new String[]{"repo", "keypair", "add"};
         if (args != null && args.length > 0 && "cfg".equals(args[0])) {
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
