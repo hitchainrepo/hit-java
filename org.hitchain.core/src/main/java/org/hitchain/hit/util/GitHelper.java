@@ -18,6 +18,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bouncycastle.util.encoders.Hex;
 import org.eclipse.jgit.internal.storage.file.LockFile;
+import org.hitchain.hit.api.DecryptableFileWrapper;
 import org.hitchain.hit.api.EncryptableFileWrapper;
 import org.hitchain.hit.api.HashedFile;
 import org.hitchain.hit.api.ProjectInfoFile;
@@ -104,14 +105,71 @@ public class GitHelper {
         updateProjectAddress(projectInfoFile, gitFileIndexHash);
     }
 
+    /**
+     * <pre>
+     * #1.Get or create ProjectInfoFile.
+     * #2.Get GitFileIndex from ProjectInfoFile contract address.
+     * #3.List all current files.
+     * #4.Compare current files and GitFileIndex and get the changed files.
+     * #5.Write changed files to ipfs.
+     * #6.Gen the new GitFileIndex.
+     * #7.Write the new GitFileIndex to disk and ipfs.
+     * #8.Call contract and update project hash(GitFileIndex hash).
+     * </pre>
+     *
+     * @param projectDir
+     */
+    public static void updateWholeHitRepository(File projectDir, ProjectInfoFile projectInfoFile) {
+        IPFS ipfs = getIpfs();
+        //#1.Get or create ProjectInfoFile.
+        String content = projectInfoFile.genSignedContent(HitHelper.getRsaPriKeyWithPasswordInput());
+        File newProjectInfoFile = null;
+        try {
+            newProjectInfoFile = File.createTempFile("projectinfo-" + System.currentTimeMillis(), null);
+            //write a temp file.
+            FileUtils.writeByteArrayToFile(newProjectInfoFile, ByteHelper.utf8(content));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        //#2.Get GitFileIndex from ProjectInfoFile contract address.
+        Map<String/*fileName*/, Two<Object, String/* ipfs hash */, String/* sha1 */>> oldGitFileIndex = new HashMap<>();
+        //#3.List all current files.
+        Map<String, File> current = listGitFiles(projectDir);
+        {// overwrite new project info file
+            current.put(HIT_PROJECT_INFO, newProjectInfoFile);
+            current.remove(HIT_GITFILE_IDX);
+        }
+        //#4.Compare current files and GitFileIndex and get the changed files.
+        Two<Object, Map<String, File>/*add*/, Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>>/*remove*/> tuple = diffGitFiles(current, oldGitFileIndex);
+        //#5.Write changed files to ipfs.
+        Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> newGitFileIndexToIpfs = writeNewFileToIpfs(tuple.first(), projectInfoFile, ipfs);
+        //#6.Gen the new GitFileIndex.
+        Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> newGitFileIndex = generateNewGitFileIndex(current, oldGitFileIndex, newGitFileIndexToIpfs);
+        //#7.Write the new GitFileIndex to disk and ipfs.
+        String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, newGitFileIndex);
+        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
+        //#8.Call contract and update project hash(GitFileIndex hash).
+        updateProjectAddress(projectInfoFile, gitFileIndexHash);
+        //#9.write project info file to disk
+        writeUpdateFile(new File(projectDir, HIT_PROJECT_INFO), ByteHelper.utf8(content));
+        FileUtils.deleteQuietly(newProjectInfoFile);
+    }
+
     public static boolean updateHitRepositoryProjectInfoFile(File projectDir, ProjectInfoFile projectInfoFile) {
         Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> combine = readGitFileIndexFromLocal(projectDir);
         //#1. write project info file to disk.
         String content = projectInfoFile.genSignedContent(HitHelper.getRsaPriKeyWithPasswordInput());
-        writeUpdateFile(new File(projectDir, HIT_PROJECT_INFO), ByteHelper.utf8(content));
+        File newProjectInfoFile = null;
+        try {
+            newProjectInfoFile = File.createTempFile("projectinfo-" + System.currentTimeMillis(), null);
+            //write a temp file.
+            FileUtils.writeByteArrayToFile(newProjectInfoFile, ByteHelper.utf8(content));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         Map<String, File> newGitFile = new HashMap<>();
         {
-            newGitFile.put(HIT_PROJECT_INFO, new File(projectDir, HIT_PROJECT_INFO));
+            newGitFile.put(HIT_PROJECT_INFO, newProjectInfoFile);
         }
         Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> twoMap = writeNewFileToIpfs(newGitFile, projectInfoFile, getIpfs());
         Two<Object, String/* ipfs hash */, String/* sha1 */> two = twoMap.isEmpty() || twoMap.values().isEmpty() ? null : twoMap.values().iterator().next();
@@ -126,6 +184,9 @@ public class GitHelper {
         System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
         //#3.Call contract and update project hash(GitFileIndex hash).
         updateProjectAddress(projectInfoFile, gitFileIndexHash);
+        //#9.write project info file to disk
+        writeUpdateFile(new File(projectDir, HIT_PROJECT_INFO), ByteHelper.utf8(content));
+        FileUtils.deleteQuietly(newProjectInfoFile);
         return true;
     }
 
@@ -265,12 +326,33 @@ public class GitHelper {
         Map<String, Two<Object, String, String>> hashMap = new HashMap();
         for (Entry<String, File> entry : newGitFile.entrySet()) {
             try {
-                ByteArrayInputStream bais = new ByteArrayInputStream(FileUtils.readFileToByteArray(entry.getValue()));
+                byte[] buf = FileUtils.readFileToByteArray(entry.getValue());
+                ByteArrayInputStream bais = new ByteArrayInputStream(buf);
+                String fileName = entry.getKey();
                 EncryptableFileWrapper file = new EncryptableFileWrapper(
-                        new HashedFile.FileWrapper(entry.getKey(), new HashedFile.ByteArrayInputStreamCallback(bais)),
+                        new HashedFile.FileWrapper(fileName, new HashedFile.ByteArrayInputStreamCallback(bais)),
                         projectInfoFile);
+                if (projectInfoFile.isPrivate()) {
+                    String rsaPriKeyWithPasswordInput = null;
+                    if (projectInfoFile.isPrivate()) {
+                        rsaPriKeyWithPasswordInput = HitHelper.getRsaPriKeyWithPasswordInput();
+                    }
+                    DecryptableFileWrapper dfile = new DecryptableFileWrapper(
+                            new HashedFile.FileWrapper(fileName,
+                                    new HashedFile.ByteArrayInputStreamCallback(file.getContents())),
+                            projectInfoFile,
+                            HitHelper.getAccountAddress(),
+                            rsaPriKeyWithPasswordInput);
+                    if (fileName.equals("index") || fileName.startsWith("objects/")) {
+                        System.out.println("GitHelper-Encrypt==" + fileName + "==" + Hex.toHexString(buf));
+                        System.out.println("GitHelper-Decrypt==" + fileName + "==" + Hex.toHexString(dfile.getContents()));
+                    } else {
+                        System.out.println("GitHelper-Encrypt==" + fileName + "==" + ByteHelper.utf8(buf));
+                        System.out.println("GitHelper-Decrypt==" + fileName + "==" + ByteHelper.utf8(dfile.getContents()));
+                    }
+                }
                 List<MerkleNode> add = ipfs.add(file);
-                hashMap.put(entry.getKey(), new Two(add.get(add.size() - 1).hash.toBase58(), sha1(entry.getValue())));
+                hashMap.put(fileName, new Two(add.get(add.size() - 1).hash.toBase58(), sha1(entry.getValue())));
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -414,10 +496,8 @@ public class GitHelper {
                     info.setEthereumUrl(HitHelper.getRepository());
                     info.setFileServerUrl(HitHelper.getStorage());
                     info.setRepoName(getProjectName(projectDir));
-                    ECKey repoKeyPair = new ECKey();
-                    //info.setRepoPubKey(Hex.toHexString(repoKeyPair.getPubKey()));
-                    //info.setRepoPriKey(Hex.toHexString(RSAHelper.encrypt(repoKeyPair.getPrivKeyBytes(), RSAHelper.getPublicKeyFromHex(rootPubKeyRsa))));
-                    String address = EthereumHelper.createContractForProject(HitHelper.getRepository(), HitHelper.getAccountPubKey(), info.getRepoName());
+                    String accountPubKey = HitHelper.getAccountPubKey();
+                    String address = EthereumHelper.createContractForProject(HitHelper.getRepository(), accountPubKey, info.getRepoName());
                     if (address == null) {
                         throw new RuntimeException("Can't not create contract for project!");
                     }
@@ -425,7 +505,7 @@ public class GitHelper {
                     info.setRepoAddress(address);
                     info.setOwner(getProjectOwner(projectDir));
                     info.setOwnerPubKeyRsa(HitHelper.getRsaPubKey());
-                    info.setOwnerAddressEcc(HitHelper.getAccountPubKey());
+                    info.setOwnerAddressEcc(accountPubKey);
                 }
                 writeUpdateFile(file, ByteHelper.utf8(info.genSignedContent(HitHelper.getRsaPriKeyWithPasswordInput())));
             }
