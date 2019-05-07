@@ -15,7 +15,6 @@ import org.hitchain.hit.api.ProjectInfoFile;
 import org.hitchain.hit.util.*;
 
 import java.io.File;
-import java.security.KeyPair;
 import java.util.Arrays;
 import java.util.LinkedList;
 
@@ -243,9 +242,7 @@ public class Main {
                         }
                         ECKey key = new ECKey();
                         String publicKey = Hex.toHexString(key.getPubKey());
-                        System.out.println("publicKey="+publicKey);
                         String privateKey = Hex.toHexString(key.getPrivKeyBytes());
-                        System.out.println("privateKey="+privateKey);
                         // Encrypt: private key -(hex decode)-> private key bytes -(encrypt with rsa public key)->  encrypt bytes -(hex encode)-> hex encrypt
                         // Decrypt: hex encrypt -(hex decode)-> encrypt bytes     -(decrypt with rsa private key)-> private key bytes -(hex encode) private key
                         String privateKeyEncryptByOwnerRsaPubKey = Hex.toHexString(
@@ -253,16 +250,12 @@ public class Main {
                                         Hex.decode(privateKey),
                                         RSAHelper.getPublicKeyFromHex(HitHelper.getRsaPubKey())
                                 ));
-                        System.out.println("privateKeyEncryptByOwnerRsaPubKey="+privateKeyEncryptByOwnerRsaPubKey);
                         projectInfoFile.setRepoPubKey(publicKey);
                         projectInfoFile.setRepoPriKey(privateKeyEncryptByOwnerRsaPubKey);
                         for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
                             String memberPubKey = ti.getMemberPubKeyRsa();
                             String privateKeyEncryptByMemberRsaPubKey = RSAHelper.encrypt(privateKey, RSAHelper.getPublicKeyFromHex(memberPubKey));
                             ti.setMemberRepoPriKey(privateKeyEncryptByMemberRsaPubKey);
-                        }
-                        {
-                            System.out.println("getPublicKeyFromEthereumPublicKeyHex="+ECCHelper.getPublicKeyFromEthereumPublicKeyHex(projectInfoFile.getRepoPubKey()));
                         }
                         GitHelper.updateWholeHitRepository(projectDir, projectInfoFile);
                         System.out.println("Repository keypair has updated.");
@@ -285,9 +278,7 @@ public class Main {
                     if (HitHelper.ACTION_renew.equals(operation)) {
                         ECKey key = new ECKey();
                         String publicKey = Hex.toHexString(key.getPubKey());
-                        System.out.println("publicKey="+publicKey);
                         String privateKey = Hex.toHexString(key.getPrivKeyBytes());
-                        System.out.println("privateKey="+privateKey);
                         String privateKeyEncryptByOwnerRsaPubKey = Hex.toHexString(
                                 RSAHelper.encrypt(
                                         Hex.decode(privateKey),
