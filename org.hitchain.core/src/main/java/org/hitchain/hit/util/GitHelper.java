@@ -332,25 +332,25 @@ public class GitHelper {
                 EncryptableFileWrapper file = new EncryptableFileWrapper(
                         new HashedFile.FileWrapper(fileName, new HashedFile.ByteArrayInputStreamCallback(bais)),
                         projectInfoFile);
-                if (projectInfoFile.isPrivate()) {
-                    String rsaPriKeyWithPasswordInput = null;
-                    if (projectInfoFile.isPrivate()) {
-                        rsaPriKeyWithPasswordInput = HitHelper.getRsaPriKeyWithPasswordInput();
-                    }
-                    DecryptableFileWrapper dfile = new DecryptableFileWrapper(
-                            new HashedFile.FileWrapper(fileName,
-                                    new HashedFile.ByteArrayInputStreamCallback(file.getContents())),
-                            projectInfoFile,
-                            HitHelper.getAccountAddress(),
-                            rsaPriKeyWithPasswordInput);
-                    if (fileName.equals("index") || fileName.startsWith("objects/")) {
-                        System.out.println("GitHelper-Encrypt==" + fileName + "==" + Hex.toHexString(buf));
-                        System.out.println("GitHelper-Decrypt==" + fileName + "==" + Hex.toHexString(dfile.getContents()));
-                    } else {
-                        System.out.println("GitHelper-Encrypt==" + fileName + "==" + ByteHelper.utf8(buf));
-                        System.out.println("GitHelper-Decrypt==" + fileName + "==" + ByteHelper.utf8(dfile.getContents()));
-                    }
-                }
+//                if (projectInfoFile.isPrivate()) {
+//                    String rsaPriKeyWithPasswordInput = null;
+//                    if (projectInfoFile.isPrivate()) {
+//                        rsaPriKeyWithPasswordInput = HitHelper.getRsaPriKeyWithPasswordInput();
+//                    }
+//                    DecryptableFileWrapper dfile = new DecryptableFileWrapper(
+//                            new HashedFile.FileWrapper(fileName,
+//                                    new HashedFile.ByteArrayInputStreamCallback(file.getContents())),
+//                            projectInfoFile,
+//                            HitHelper.getAccountAddress(),
+//                            rsaPriKeyWithPasswordInput);
+//                    if (fileName.equals("index") || fileName.startsWith("objects/")) {
+//                        System.out.println("GitHelper-Encrypt==" + fileName + "==" + Hex.toHexString(buf));
+//                        System.out.println("GitHelper-Decrypt==" + fileName + "==" + Hex.toHexString(dfile.getContents()));
+//                    } else {
+//                        System.out.println("GitHelper-Encrypt==" + fileName + "==" + ByteHelper.utf8(buf));
+//                        System.out.println("GitHelper-Decrypt==" + fileName + "==" + ByteHelper.utf8(dfile.getContents()));
+//                    }
+//                }
                 List<MerkleNode> add = ipfs.add(file);
                 hashMap.put(fileName, new Two(add.get(add.size() - 1).hash.toBase58(), sha1(entry.getValue())));
             } catch (Exception e) {
