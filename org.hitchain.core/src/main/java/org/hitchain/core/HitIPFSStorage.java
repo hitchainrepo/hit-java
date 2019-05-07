@@ -125,7 +125,7 @@ public class HitIPFSStorage {
      * @throws IOException
      */
     public byte[] get(String filePath) throws IOException {
-        System.out.println("get filename:" + filePath);
+        //System.out.println("get filename:" + filePath);
         Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get(filePath);
         if (ipfsHashAndSha1 == null || StringUtils.isBlank(ipfsHashAndSha1.first())) {
             throw new FileNotFoundException("File not found: " + filePath);
@@ -168,7 +168,7 @@ public class HitIPFSStorage {
      * @return ipfs hash.
      */
     public String put(String filePath, byte[] data) {
-        System.out.println("Uploading file:" + filePath + "...");
+        //System.out.println("Uploading file:" + filePath + "...");
         try {
             ByteArrayInputStream is = new ByteArrayInputStream(data);
             EncryptableFileWrapper file = new EncryptableFileWrapper(
@@ -200,7 +200,7 @@ public class HitIPFSStorage {
      * @throws IOException
      */
     public OutputStream beginPut(String filePath, ProgressMonitor monitor, String monitorTask) throws IOException {
-        System.out.println("BeginPut file:" + filePath + "...");
+        //System.out.println("BeginPut file:" + filePath + "...");
         ByteArrayOutputStream os = new ByteArrayOutputStream() {
             public void close() throws IOException {
                 onBeginPutClose(filePath, monitor, monitorTask, toByteArray());
