@@ -98,8 +98,6 @@ public class DecryptableFileWrapper implements NamedStreamable {
                             Hex.decode(encryptedRepositoryPriKey),
                             RSAHelper.getPrivateKeyFromHex(priKeyRsa)
                     ));
-            System.out.println("privateKeyEncryptByOwnerRsaPubKey=" + encryptedRepositoryPriKey);
-            System.out.println("privateKey=" + repositoryPriKey);
             byte[] bytes = ECCHelper.privateDecrypt(bs, ECCHelper.getPrivateKeyFromEthereumHex(repositoryPriKey));
             return new ByteArrayInputStream(bytes);
         } catch (Exception e) {
