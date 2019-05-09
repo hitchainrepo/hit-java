@@ -920,7 +920,7 @@
   </profiles>
 
   <modules>
-    <module>org.hitchain.core</module>
+    <!--/*add by hit*/--><module>org.hitchain.core</module><!--/*end of add*/-->
     <module>org.eclipse.jgit</module>
     <module>org.eclipse.jgit.ant</module>
     <module>org.eclipse.jgit.archive</module>
@@ -943,6 +943,7 @@
     <module>org.eclipse.jgit.lfs.test</module>
     <module>org.eclipse.jgit.lfs.server.test</module>
     <module>org.eclipse.jgit.ssh.apache.test</module>
+    <!--/*add by hit*/--><module>org.hitchain.pgm</module><!--/*end of add*/-->
   </modules>
 
 </project>

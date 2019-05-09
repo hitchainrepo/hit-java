@@ -74,11 +74,7 @@ public class HitIPFSStorage {
                     try {
                         byte[] cat = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
                         projectInfoFile = ProjectInfoFile.fromFile(
-                                new HashedFile.FileWrapper(GitHelper.HIT_PROJECT_INFO, new HashedFile.InputStreamCallback() {
-                                    public InputStream call(HashedFile hashedFile) throws IOException {
-                                        return new ByteArrayInputStream(cat);
-                                    }
-                                }));
+                                new HashedFile.FileWrapper(GitHelper.HIT_PROJECT_INFO, new HashedFile.ByteArrayInputStreamCallback(cat)));
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
@@ -137,8 +133,20 @@ public class HitIPFSStorage {
         //System.out.println("get filename:" + filePath + ", ipfs:" + ipfsHashAndSha1.first() + ", sha1:" + ipfsHashAndSha1.second());
         byte[] content = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
         //System.out.println("file content:" + new String(content));
-        DecryptableFileWrapper file = new DecryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(content)), projectInfoFile, "root", HitHelper.getRsaPriKeyWithPasswordInput());
-        return file.getContents();
+        String rsaPriKeyWithPasswordInput = null;
+        if (projectInfoFile.isPrivate()) {
+            rsaPriKeyWithPasswordInput = HitHelper.getRsaPriKeyWithPasswordInput();
+        }
+        DecryptableFileWrapper file = new DecryptableFileWrapper(
+                new HashedFile.FileWrapper(
+                        filePath,
+                        new HashedFile.ByteArrayInputStreamCallback(content)
+                ),
+                projectInfoFile,
+                HitHelper.getAccountAddress(),
+                rsaPriKeyWithPasswordInput);
+        byte[] contents = file.getContents();
+        return contents;
     }
 
     /**
@@ -160,10 +168,13 @@ public class HitIPFSStorage {
      * @return ipfs hash.
      */
     public String put(String filePath, byte[] data) {
-        System.out.println("Uploading file:" + filePath + "...");
+        //System.out.println("Uploading file:" + filePath + "...");
         try {
             ByteArrayInputStream is = new ByteArrayInputStream(data);
-            EncryptableFileWrapper file = new EncryptableFileWrapper(new HashedFile.FileWrapper(filePath, new HashedFile.ByteArrayInputStreamCallback(is)), projectInfoFile);
+            EncryptableFileWrapper file = new EncryptableFileWrapper(
+                    new HashedFile.FileWrapper(filePath,
+                            new HashedFile.ByteArrayInputStreamCallback(is)),
+                    projectInfoFile);
             List<MerkleNode> add = ipfs.add(file);
             String ipfsHash = add.get(add.size() - 1).hash.toBase58();
             {// add ipfs hash to uploadedGitFileIndex.

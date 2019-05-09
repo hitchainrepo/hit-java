@@ -23,7 +23,6 @@ import java.math.BigInteger;
 import java.security.*;
 import java.security.spec.*;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Random;
 
 public class ECCHelper {
@@ -51,38 +50,34 @@ public class ECCHelper {
 
     // 生成秘钥对
     public static KeyPair getKeyPair() throws Exception {
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("EC", "BC");
-        keyPairGenerator.initialize(256, new SecureRandom());
-        KeyPair keyPair = keyPairGenerator.generateKeyPair();
-        return keyPair;
+        ECKey key = new ECKey();
+        return new KeyPair(getPublicKeyFromEthereumPublicKeyHex(Hex.toHexString(key.getPubKey())), getPrivateKeyFromEthereumHex(Hex.toHexString(key.getPrivKeyBytes())));
     }
 
-    // 获取公钥(Base64编码)
+    // 获取公钥(Hex编码)
     public static String getPublicKey(KeyPair keyPair) {
-        ECPublicKey publicKey = (ECPublicKey) keyPair.getPublic();
-        byte[] bytes = publicKey.getEncoded();
-        return Base64.getEncoder().encodeToString(bytes);
+        byte[] bytes = keyPair.getPublic().getEncoded();
+        return Hex.toHexString(bytes);
     }
 
-    // 获取私钥(Base64编码)
+    // 获取私钥(Hex编码)
     public static String getPrivateKey(KeyPair keyPair) {
-        ECPrivateKey privateKey = (ECPrivateKey) keyPair.getPrivate();
-        byte[] bytes = privateKey.getEncoded();
-        return Base64.getEncoder().encodeToString(bytes);
+        byte[] bytes = keyPair.getPrivate().getEncoded();
+        return Hex.toHexString(bytes);
     }
 
-    // 将Base64编码后的公钥转换成PublicKey对象
+    // 将Hex编码后的公钥转换成PublicKey对象
     public static ECPublicKey string2PublicKey(String pubStr) throws Exception {
-        byte[] keyBytes = Base64.getDecoder().decode(pubStr);
+        byte[] keyBytes = Hex.decode(pubStr);
         X509EncodedKeySpec keySpec = new X509EncodedKeySpec(keyBytes);
         KeyFactory keyFactory = KeyFactory.getInstance("EC", "BC");
         ECPublicKey publicKey = (ECPublicKey) keyFactory.generatePublic(keySpec);
         return publicKey;
     }
 
-    // 将Base64编码后的私钥转换成PrivateKey对象
+    // 将Hex编码后的私钥转换成PrivateKey对象
     public static ECPrivateKey string2PrivateKey(String priStr) throws Exception {
-        byte[] keyBytes = Base64.getDecoder().decode(priStr);
+        byte[] keyBytes = Hex.decode(priStr);
         PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
         KeyFactory keyFactory = KeyFactory.getInstance("EC", "BC");
         ECPrivateKey privateKey = (ECPrivateKey) keyFactory.generatePrivate(keySpec);
@@ -374,8 +369,8 @@ public class ECCHelper {
         KeyPair keyPair = ECCHelper.getKeyPair();
         String publicKeyStr = ECCHelper.getPublicKey(keyPair);
         String privateKeyStr = ECCHelper.getPrivateKey(keyPair);
-        System.out.println("ECC公钥Base64编码:" + publicKeyStr);
-        System.out.println("ECC私钥Base64编码:" + privateKeyStr);
+        System.out.println("ECC公钥Hex编码:" + publicKeyStr);
+        System.out.println("ECC私钥Hex编码:" + privateKeyStr);
 
         ECPublicKey publicKey = string2PublicKey(publicKeyStr);
         ECPrivateKey privateKey = string2PrivateKey(privateKeyStr);

@@ -56,9 +56,16 @@ public class HitHelper {
     public static final String TYPE_repository = "repository";
     public static final String TYPE_help = "help";
     public static final String TYPE_create = "create";
+    //
+    public static final String TYPE_member = "member";
+    public static final String TYPE_keypair = "keypair";
+    //
     public static final String ACTION_add = "add";
     public static final String ACTION_remove = "remove";
     public static final String ACTION_set = "set";
+    //
+    public static final String ACTION_renew = "renew";
+
     public static final String NAME_default = "default";
     public static final String FILE_HIT_CONFIG = StringUtils.defaultString(System.getProperty("user.home"), ".") + "/.hit/config";
     private static Map<String/*section*/, Map<String/*name*/, String/*value*/>> hitConfig = null;

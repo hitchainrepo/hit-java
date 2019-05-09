@@ -9,10 +9,12 @@
 package org.hitchain.hit.api;
 
 import io.ipfs.api.NamedStreamable;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bouncycastle.util.encoders.Hex;
 import org.hitchain.hit.api.ProjectInfoFile.TeamInfo;
 import org.hitchain.hit.util.ECCHelper;
+import org.hitchain.hit.util.GitHelper;
 import org.hitchain.hit.util.RSAHelper;
 
 import java.io.ByteArrayInputStream;
@@ -61,34 +63,46 @@ public class DecryptableFileWrapper implements NamedStreamable {
         }
     }
 
+    public byte[] getContents() throws IOException {
+        return IOUtils.toByteArray(getInputStream());
+    }
+
     public InputStream getInputStream() throws IOException {
-        if (projectInfoFile.isPrivate()) {
-            String encrypt = null;
+        byte[] bs = source.getContents();
+        if (GitHelper.HIT_PROJECT_INFO.equals(source.getName()) || GitHelper.HIT_GITFILE_IDX.equals(source.getName()) || !projectInfoFile.isPrivate()) {
+            return new ByteArrayInputStream(bs);
+        }
+        String encryptedRepositoryPriKey = null;
+        {// get the encrypted repository private key, if is owner return repository private key, if is member return member's repository private key.
             if (StringUtils.equalsAny(member, projectInfoFile.getOwner(), projectInfoFile.getOwnerPubKeyRsa(),
                     projectInfoFile.getOwnerAddressEcc())) {// #if is owner, get the repository encrypted private key.
-                encrypt = projectInfoFile.getRepoPriKey();
+                encryptedRepositoryPriKey = projectInfoFile.getRepoPriKey();
             } else {
                 for (TeamInfo ti : projectInfoFile.getMembers()) {
                     if (StringUtils.equalsAny(member, ti.getMember(), ti.getMemberPubKeyRsa(),
                             ti.getMemberAddressEcc())) {
-                        encrypt = ti.getMemberRepoPriKey();
+                        encryptedRepositoryPriKey = ti.getMemberRepoPriKey();
+                        break;
                     }
                 }
             }
-            try {
-                if (encrypt == null) {
-                    return source.getInputStream();
-                }
-                byte[] repositoryPrivateKey = RSAHelper.decrypt(encrypt.getBytes(), RSAHelper.getPrivateKeyFromHex(priKeyRsa));
-                InputStream is = source.getInputStream();
-                byte[] bytes = ECCHelper.privateDecrypt(is, ECCHelper.getPrivateKeyFromEthereumHex(Hex.toHexString(repositoryPrivateKey)));
-                is.close();
-                return new ByteArrayInputStream(bytes);
-            } catch (Exception e) {
-                throw new IOException(e);
-            }
         }
-        return source.getInputStream();
+        if (encryptedRepositoryPriKey == null) {
+            return new ByteArrayInputStream(bs);
+        }
+        try {
+            // Encrypt: private key -(hex decode)-> private key bytes -(encrypt with rsa public key)->  encrypt bytes -(hex encode)-> hex encrypt
+            // Decrypt: hex encrypt -(hex decode)-> encrypt bytes     -(decrypt with rsa private key)-> private key bytes -(hex encode) private key
+            String repositoryPriKey = Hex.toHexString(
+                    RSAHelper.decrypt(
+                            Hex.decode(encryptedRepositoryPriKey),
+                            RSAHelper.getPrivateKeyFromHex(priKeyRsa)
+                    ));
+            byte[] bytes = ECCHelper.privateDecrypt(bs, ECCHelper.getPrivateKeyFromEthereumHex(repositoryPriKey));
+            return new ByteArrayInputStream(bytes);
+        } catch (Exception e) {
+            throw new IOException(e);
+        }
     }
 
     public boolean isDirectory() {
