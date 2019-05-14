@@ -12,36 +12,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <local.repository.path>file://${project.basedir}/lib</local.repository.path>
     </properties>
-    <repositories>
-        <repository>
-            <id>project repository</id>
-            <url>${local.repository.path}</url>
-        </repository>
-        <repository>
-            <id>nexus-aliyun</id>
-            <name>Nexus aliyun</name>
-            <url>http://maven.aliyun.com/nexus/content/groups/public</url>
-        </repository>
-        <repository>
-            <id>apache-maven</id>
-            <name>apache maven</name>
-            <url>http://repo1.maven.org/maven2</url>
-        </repository>
-        <repository>
-            <id>jitpack</id>
-            <name>jitpack</name>
-            <url>https://jitpack.io</url>
-        </repository>
-    </repositories>
-    <pluginRepositories>
-        <pluginRepository>
-            <id>apache-maven</id>
-            <name>apache maven</name>
-            <url>http://repo1.maven.org/maven2</url>
-        </pluginRepository>
-    </pluginRepositories>
     <dependencies>
         <!-- common -->
         <dependency>
