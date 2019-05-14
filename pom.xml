@@ -920,6 +920,7 @@
   </profiles>
 
   <modules>
+    <!--/*add by hit*/--><module>org.hitchain.contract</module><!--/*end of add*/-->
     <!--/*add by hit*/--><module>org.hitchain.core</module><!--/*end of add*/-->
     <module>org.eclipse.jgit</module>
     <module>org.eclipse.jgit.ant</module>
