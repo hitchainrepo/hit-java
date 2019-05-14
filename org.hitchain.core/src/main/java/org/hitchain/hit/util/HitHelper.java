@@ -58,6 +58,7 @@ public class HitHelper {
     public static final String TYPE_repository = "repository";
     public static final String TYPE_help = "help";
     public static final String TYPE_create = "create";
+    public static final String TYPE_recover = "recover";
     public static final String TYPE_chain = "chain";
     //
     public static final String TYPE_member = "member";
@@ -164,7 +165,7 @@ public class HitHelper {
             two.result(kv.get(NAME_default));
             return two;
         }
-        if (TYPE_storage.equals(section) || TYPE_repository.equals(section)  || TYPE_chain.equals(section) || TYPE_main.equals(section)) {
+        if (TYPE_storage.equals(section) || TYPE_repository.equals(section) || TYPE_chain.equals(section) || TYPE_main.equals(section)) {
             if (!kv.containsKey(name)) {
                 return null;
             }
