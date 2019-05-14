@@ -18,7 +18,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bouncycastle.util.encoders.Hex;
 import org.eclipse.jgit.internal.storage.file.LockFile;
-import org.hitchain.hit.api.DecryptableFileWrapper;
 import org.hitchain.hit.api.EncryptableFileWrapper;
 import org.hitchain.hit.api.HashedFile;
 import org.hitchain.hit.api.ProjectInfoFile;
@@ -259,7 +258,7 @@ public class GitHelper {
     }
 
     private static void updateProjectAddress(ProjectInfoFile projectInfoFile, String newProjectAddress) {
-        EthereumHelper.updateProjectAddress(HitHelper.getRepository(), projectInfoFile.getRepoAddress(), EthereumHelper.encryptPriKeyEcc(HitHelper.getRepository(), HitHelper.getAccountPriKeyWithPasswordInput()), newProjectAddress);
+        EthereumHelper.updateProjectAddress(HitHelper.getRepository(), projectInfoFile.getRepoAddress(), HitHelper.getAccountPriKeyWithPasswordInput(), newProjectAddress);
     }
 
     private static String writeGitFileIndexToIpfs(File projectDir, Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileHash) {

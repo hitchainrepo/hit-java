@@ -2,6 +2,8 @@ package org.hitchain.hit.util;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.bouncycastle.util.encoders.Hex;
+import org.hitchain.hit.api.ProjectInfoFile;
 
 import java.io.BufferedReader;
 import java.io.Console;
@@ -56,6 +58,7 @@ public class HitHelper {
     public static final String TYPE_repository = "repository";
     public static final String TYPE_help = "help";
     public static final String TYPE_create = "create";
+    public static final String TYPE_chain = "chain";
     //
     public static final String TYPE_member = "member";
     public static final String TYPE_keypair = "keypair";
@@ -161,7 +164,7 @@ public class HitHelper {
             two.result(kv.get(NAME_default));
             return two;
         }
-        if (TYPE_storage.equals(section) || TYPE_repository.equals(section) || TYPE_main.equals(section)) {
+        if (TYPE_storage.equals(section) || TYPE_repository.equals(section)  || TYPE_chain.equals(section) || TYPE_main.equals(section)) {
             if (!kv.containsKey(name)) {
                 return null;
             }
@@ -202,7 +205,7 @@ public class HitHelper {
             kv.put(pri, value2);
             return true;
         }
-        if (TYPE_storage.equals(section) || TYPE_repository.equals(section) || TYPE_main.equals(section)) {
+        if (TYPE_storage.equals(section) || TYPE_repository.equals(section) || TYPE_chain.equals(section) || TYPE_main.equals(section)) {
             if (NAME_default.equals(name)) {
                 kv.put(name, value1);
                 return true;
@@ -241,7 +244,7 @@ public class HitHelper {
             }
             return true;
         }
-        if (TYPE_storage.equals(section) || TYPE_repository.equals(section) || TYPE_main.equals(section)) {
+        if (TYPE_storage.equals(section) || TYPE_repository.equals(section) || TYPE_chain.equals(section) || TYPE_main.equals(section)) {
             kv.remove(name);
             if (name.equals(StringUtils.trim(kv.get(NAME_default)))) {
                 kv.put(NAME_default, "");
@@ -526,6 +529,50 @@ public class HitHelper {
         return true;
     }
 
+    public static void chainInfo(String name) {
+        if (name == null) {
+            hitConfigInfo(TYPE_chain);
+            return;
+        }
+        Tuple.Two<String, String, String> two = getByName(getHitConfig(), TYPE_chain, name);
+        if (two == null) {
+            System.out.println("Can not find the chain name: " + name);
+            return;
+        }
+        System.out.println("The information by chain's name: " + name);
+        System.out.println("chain url :" + two.first());
+        System.out.println("default    name:" + two.result());
+    }
+
+    public static boolean chainAdd(String name, String url) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        if (!isValidUrl(url)) {
+            return false;
+        }
+        addByName(getHitConfig(), TYPE_chain, name, url, null);
+        return true;
+    }
+
+    public static boolean chainRemove(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        return removeByName(getHitConfig(), TYPE_chain, name);
+    }
+
+    public static boolean chainSet(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        if (getByName(getHitConfig(), TYPE_chain, name) == null || !addByName(getHitConfig(), TYPE_chain, NAME_default, name, null)) {
+            System.out.println("Can not find the chain " + name + " config!");
+            return false;
+        }
+        return true;
+    }
+
     public static Map<String, Map<String, String>> getHitConfig() {
         return hitConfig == null ? hitConfig() : hitConfig;
     }
@@ -605,6 +652,11 @@ public class HitHelper {
 
     public static String getRepository() {
         Tuple.Two<String, String, String> two = getDefaultValue(TYPE_repository);
+        return two == null ? null : two.first();
+    }
+
+    public static String getChain() {
+        Tuple.Two<String, String, String> two = getDefaultValue(TYPE_chain);
         return two == null ? null : two.first();
     }
 
@@ -716,5 +768,136 @@ public class HitHelper {
             passwordCache = WalletHelper.encryptWithPasswordHex(password, passwordEncrypt);
         }
         return password;
+    }
+
+    //
+    public static void printMemberInfo(ProjectInfoFile projectInfoFile) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Team members: \n");
+        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
+            sb.append(StringUtils.rightPad(ti.getMember(), 20)).append(' ')
+                    .append(StringUtils.rightPad(ti.getMemberAddressEcc(), 45)).append(' ')
+                    .append(ti.getMemberPubKeyRsa()).append('\n');
+        }
+        System.out.println(sb);
+    }
+
+    public static boolean removeMember(File projectDir, String member, String memberAddressEcc, ProjectInfoFile projectInfoFile) {
+        ProjectInfoFile.TeamInfo teamInfo = null;
+        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
+            if (StringUtils.equals(ti.getMember(), member)) {
+                teamInfo = ti;
+                break;
+            }
+        }
+        if (teamInfo == null) {
+            System.out.println("No member found.");
+            return true;
+        }
+        projectInfoFile.getMembers().remove(teamInfo);
+        String result = EthereumHelper.removeTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc);
+        if (EthereumHelper.isError(result)) {
+            System.err.println("Remove member error:" + result);
+            System.exit(1);
+        }
+        if (!GitHelper.updateHitRepositoryProjectInfoFile(projectDir, projectInfoFile)) {
+            System.err.println("Update project info file error.");
+            System.exit(1);
+        }
+        System.out.println("Member has removed in the contract.");
+        return true;
+    }
+
+    public static void addMember(File projectDir, String member, String memberPubKeyRsa, String memberAddressEcc, ProjectInfoFile projectInfoFile) {
+        if (StringUtils.isBlank(member) || StringUtils.isBlank(memberPubKeyRsa) || StringUtils.isBlank(memberAddressEcc)) {
+            System.err.println("Can't not execute command.");
+            System.exit(1);
+        }
+        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
+            if (StringUtils.equals(ti.getMember(), member) || StringUtils.equals(ti.getMemberAddressEcc(), memberAddressEcc)) {
+                System.out.println("Member is exists.");
+                return;
+            }
+        }
+        if (projectInfoFile.isPrivate()) {
+            projectInfoFile.addMemberPrivate(member, memberPubKeyRsa, memberAddressEcc, HitHelper.getRsaPriKeyWithPasswordInput());
+        } else {
+            projectInfoFile.addMemberPublic(member, memberPubKeyRsa, memberAddressEcc);
+        }
+        if (EthereumHelper.hasTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc)) {
+            System.out.println("Member is exists in the contract.");
+            return;
+        }
+        String result = EthereumHelper.addTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc);
+        if (EthereumHelper.isError(result)) {
+            System.err.println("Add member error:" + result);
+            System.exit(1);
+        }
+        if (!GitHelper.updateHitRepositoryProjectInfoFile(projectDir, projectInfoFile)) {
+            System.err.println("Update project info file error.");
+            System.exit(1);
+        }
+        System.out.println("Member has added in the contract.");
+        return;
+    }
+
+    public static ProjectInfoFile getProjectInfoFile(File projectDir) {
+        ProjectInfoFile projectInfoFile = null;
+        if (GitHelper.existProjectInfoFile(projectDir)) {
+            projectInfoFile = GitHelper.readProjectInfoFile(projectDir);
+        }
+        if (projectInfoFile == null) {
+            System.err.println(projectDir.getAbsolutePath() + " is invalid hit repository.");
+            System.exit(1);
+        }
+        if (!StringUtils.equals(HitHelper.getAccountAddress(), projectInfoFile.getOwnerAddressEcc())) {
+            System.err.println("Only owner can change this settings.");
+            System.exit(1);
+        }
+        if (!projectInfoFile.verify(null)) {
+            System.err.println("Project info file is not verify.");
+            System.exit(1);
+        }
+        return projectInfoFile;
+    }
+
+    //
+    public static void removeKeyPair(File projectDir, ProjectInfoFile projectInfoFile) {
+        projectInfoFile.setRepoPubKey(null);
+        projectInfoFile.setRepoPriKey(null);
+        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
+            ti.setMemberRepoPriKey(null);
+        }
+        GitHelper.updateWholeHitRepository(projectDir, projectInfoFile);
+    }
+
+    public static void addKeyPair(File projectDir, ProjectInfoFile projectInfoFile) {
+        ECKey key = new ECKey();
+        String publicKey = Hex.toHexString(key.getPubKey());
+        String privateKey = Hex.toHexString(key.getPrivKeyBytes());
+        // Encrypt: private key -(hex decode)-> private key bytes -(encrypt with rsa public key)->  encrypt bytes -(hex encode)-> hex encrypt
+        // Decrypt: hex encrypt -(hex decode)-> encrypt bytes     -(decrypt with rsa private key)-> private key bytes -(hex encode) private key
+        String privateKeyEncryptByOwnerRsaPubKey = Hex.toHexString(
+                RSAHelper.encrypt(
+                        Hex.decode(privateKey),
+                        RSAHelper.getPublicKeyFromHex(HitHelper.getRsaPubKey())
+                ));
+        projectInfoFile.setRepoPubKey(publicKey);
+        projectInfoFile.setRepoPriKey(privateKeyEncryptByOwnerRsaPubKey);
+        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
+            String memberPubKey = ti.getMemberPubKeyRsa();
+            String privateKeyEncryptByMemberRsaPubKey = RSAHelper.encrypt(privateKey, RSAHelper.getPublicKeyFromHex(memberPubKey));
+            ti.setMemberRepoPriKey(privateKeyEncryptByMemberRsaPubKey);
+        }
+        GitHelper.updateWholeHitRepository(projectDir, projectInfoFile);
+    }
+
+    public static void printKeyPairInfo(ProjectInfoFile projectInfoFile) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Key Pair: \n");
+        sb.append("Is private: ").append(projectInfoFile.isPrivate()).append("\n")
+                .append("Public  Key:").append(projectInfoFile.getRepoPubKey()).append("\n")
+                .append("Private Key:").append(projectInfoFile.getRepoPriKey()).append("\n");
+        System.out.println(sb);
     }
 }
