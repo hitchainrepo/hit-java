@@ -68,9 +68,12 @@ public class WalletHelper {
     }
 
     /**
+     * Convert string to Mnemonic Words.
+     * <pre>
      * 01byte: str length.
      * 02-password_length:str.
      * 1+password_length+1-[16|20|24|28|32]:random bytes.
+     * </pre>
      *
      * @param str
      * @return
@@ -89,9 +92,12 @@ public class WalletHelper {
     }
 
     /**
+     * Decode Mnemonic Words to string.
+     * <pre>
      * 01byte: mnemonic length.
      * 02-password_length:mnemonic.
      * 1+password_length+1-[16|20|24|28|32]:random bytes.
+     * </pre>
      *
      * @param mnemonic
      * @return

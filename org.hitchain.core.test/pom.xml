@@ -12,13 +12,8 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <local.repository.path>file://${project.basedir}/lib</local.repository.path>
     </properties>
     <repositories>
-        <repository>
-            <id>project repository</id>
-            <url>${local.repository.path}</url>
-        </repository>
         <repository>
             <id>nexus-aliyun</id>
             <name>Nexus aliyun</name>

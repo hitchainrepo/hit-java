@@ -7,12 +7,18 @@
  ******************************************************************************/
 package org.hitchain.core;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.bouncycastle.util.encoders.Hex;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.Repository;
+import org.hitchain.contract.api.RepositoryContractEthereumApi;
+import org.hitchain.contract.api.TokenEthereumApi;
+import org.hitchain.contract.ethereum.RepositoryContractEthereumService;
+import org.hitchain.contract.ethereum.TokenEthereumService;
 import org.hitchain.hit.api.ProjectInfoFile;
-import org.hitchain.hit.util.*;
+import org.hitchain.hit.util.HitHelper;
+import org.hitchain.hit.util.WalletHelper;
+import org.iff.infra.util.NumberHelper;
 
 import java.io.File;
 import java.util.Arrays;
@@ -57,9 +63,67 @@ import java.util.LinkedList;
  * auto generate by qdp.
  */
 public class Main {
+    public static final String HELP_CFG = "" +
+            "hit cfg help\n" +
+            "hit cfg create     password\n" +
+            "hit cfg recover    password\n" +
+            "hit cfg account    add name [priKey]        password\n" +
+            "hit cfg rsa        add name [priKey pubKey] password\n" +
+            "hit cfg storage    add name url\n" +
+            "hit cfg repository add name url\n" +
+            "hit cfg chain      add name url(https://ropsten.infura.io, https://mainnet.infura.io/0x7995ab36bB307Afa6A683C24a25d90Dc1Ea83566)\n" +
+            "hit cfg [account|rsa|storage|repository|chain] remove name\n" +
+            "hit cfg [account|rsa|storage|repository|chain] set    name";
+    public static final String HELP_REPO = "" +
+            "hit repo help\n" +
+            "hit repo keypair   add\n" +
+            "hit repo keypair   remove\n" +
+            "hit repo keypair   renew\n" +
+            "hit repo member    add    memberEmail publicRsa eccAddress\n" +
+            "hit repo member    remove memberEmail";
+    public static final String HELP_CONTRACT = "" +
+            "hit contract help\n" +
+            "hit contract repositoryName\n" +
+            "hit contract repositoryAddress\n" +
+            "hit contract owner\n" +
+            "hit contract delegator\n" +
+            "hit contract authedAccounts           memberAddress\n" +
+            "hit contract authedAccountList        index\n" +
+            "hit contract authedAccountSize\n" +
+            "hit contract hasTeamMember            memberAddress\n" +
+            "hit contract teamMemberAtIndex        index\n" +
+            "hit contract deploy                   gasLimit(5000000)  gWei\n" +
+            "hit contract init                     gasLimit( 500000)  gWei  ownerAddress repositoryName\n" +
+            "hit contract initWithDelegator        gasLimit( 500000)  gWei  ownerAddress repositoryName delegatorAddress\n" +
+            "hit contract updateRepositoryName     gasLimit( 500000)  gWei  newRepositoryName \n" +
+            "hit contract updateRepositoryAddress  gasLimit( 500000)  gWei  newRepositoryAddress\n" +
+            "hit contract addTeamMember            gasLimit( 500000)  gWei  memberAddress\n" +
+            "hit contract removeTeamMember         gasLimit( 500000)  gWei  memberAddress\n" +
+            "hit contract changeOwner              gasLimit( 500000)  gWei  memberAddress\n" +
+            "hit contract delegateTo               gasLimit( 500000)  gWei  delegatorAddress";
+    public static final String HELP_TOKEN = "" +
+            "hit token help\n" +
+            "hit token readToken        [accountAddress]\n" +
+            "hit token readHitToken     [accountAddress]\n" +
+            "hit token readContactToken contractAddress functionName [accountAddress]\n" +
+            "hit token requestTestToken [accountAddress]";
+
     public static void main(String[] args) throws Exception {
         //System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/hello");
-        //args = new String[]{"repo", "keypair", "add"};
+        //
+        String[] needPassword = new String[]{"cfg", "repo", "contract", "token", "push", "fetch"};
+        //
+        if (!HitHelper.getHitConfig().isEmpty() && args.length > 0 && ArrayUtils.contains(needPassword, args[0])) {
+            HitHelper.getAccountPriKeyWithPasswordInput();
+        }
+        //
+        if (args != null && args.length > 0 && "help".equals(args[0])) {
+            System.out.println(HELP_CFG);
+            System.out.println(HELP_REPO);
+            System.out.println(HELP_CONTRACT);
+            System.out.println(HELP_TOKEN);
+        }
+        //
         if (args != null && args.length > 0 && "cfg".equals(args[0])) {
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
@@ -74,14 +138,7 @@ public class Main {
             String v2 = list.poll();// [priKey] [pubKey] password, url, null
             String v3 = list.poll();// [priKey] [pubKey] password, url, null
             if (HitHelper.TYPE_help.equals(type)) {
-                System.out.println("hit cfg help");
-                System.out.println("hit cfg create     password");
-                System.out.println("hit cfg account    add name [priKey]        password");
-                System.out.println("hit cfg rsa        add name [priKey pubKey] password");
-                System.out.println("hit cfg storage    add name url");
-                System.out.println("hit cfg repository add name url");
-                System.out.println("hit cfg [account|rsa|storage|repository] remove name");
-                System.out.println("hit cfg [account|rsa|storage|repository] set    name");
+                System.out.println(HELP_CFG);
                 return;
             }
             if (HitHelper.TYPE_create.equals(type)) {
@@ -184,8 +241,42 @@ public class Main {
                 HitHelper.repositoryInfo(name);
                 return;
             }
-        }
-        if (args != null && args.length > 0 && "repo".equals(args[0])) {
+            if (HitHelper.TYPE_recover.equals(type)) {
+                if ("password".equals(operation)) {
+                    System.err.println("Input the mnemonic words:");
+                    String input = HitHelper.readFromSystemInput();
+                    String password = WalletHelper.mnemonicToString(input);
+                    System.out.println("The recover value:" + password);
+                    return;
+                }
+                return;
+            }
+            if (HitHelper.TYPE_chain.equals(type)) {
+                if (HitHelper.ACTION_add.equals(operation)) {
+                    if (HitHelper.chainAdd(name, v1)) {
+                        HitHelper.hitConfigToFile(HitHelper.getHitConfig());
+                    }
+                    return;
+                }
+                if (HitHelper.ACTION_remove.equals(operation)) {
+                    if (HitHelper.chainRemove(name)) {
+                        HitHelper.hitConfigToFile(HitHelper.getHitConfig());
+                    }
+                    return;
+                }
+                if (HitHelper.ACTION_set.equals(operation)) {
+                    if (HitHelper.chainSet(name)) {
+                        HitHelper.hitConfigToFile(HitHelper.getHitConfig());
+                    }
+                    return;
+                }
+                HitHelper.chainInfo(name);
+                return;
+            }
+
+            System.out.println(HELP_CFG);
+            return;
+        } else if (args != null && args.length > 0 && "repo".equals(args[0])) {
             File projectDir = null;
             {
                 String workDir = System.getProperty("git_work_tree");
@@ -202,8 +293,7 @@ public class Main {
                 LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
                 list.poll();
                 if (list.isEmpty()) {
-                    // list all members
-                    return;
+                    list.add(HitHelper.TYPE_help);
                 }
                 String type = list.poll();//member, keypair
                 String operation = list.poll();//add, remove
@@ -211,26 +301,21 @@ public class Main {
                 String memberPubKeyRsa = list.poll();//成员的RSA公钥
                 String memberAddressEcc = list.poll();//成员的Ethereum地址
                 if (HitHelper.TYPE_help.equals(type)) {
-                    System.out.println("hit repo help");
-                    System.out.println("hit repo keypair   add");
-                    System.out.println("hit repo keypair   remove");
-                    System.out.println("hit repo keypair   renew");
-                    System.out.println("hit repo member    add    memberEmail publicRsa eccAddress");
-                    System.out.println("hit repo member    remove memberEmail");
+                    System.out.println(HELP_REPO);
                     return;
                 }
-                ProjectInfoFile projectInfoFile = getProjectInfoFile(projectDir);
+                ProjectInfoFile projectInfoFile = HitHelper.getProjectInfoFile(projectDir);
                 if (HitHelper.TYPE_member.equals(type)) {
                     if (HitHelper.ACTION_add.equals(operation)) {
-                        addMember(projectDir, member, memberPubKeyRsa, memberAddressEcc, projectInfoFile);
+                        HitHelper.addMember(projectDir, member, memberPubKeyRsa, memberAddressEcc, projectInfoFile);
                         return;
                     }
                     if (HitHelper.ACTION_remove.equals(operation)) {
-                        if (removeMember(projectDir, member, memberAddressEcc, projectInfoFile)) return;
+                        if (HitHelper.removeMember(projectDir, member, memberAddressEcc, projectInfoFile)) return;
                         return;
                     }
                     {// print team member info.
-                        printMemberInfo(projectInfoFile);
+                        HitHelper.printMemberInfo(projectInfoFile);
                     }
                     return;
                 }
@@ -240,24 +325,7 @@ public class Main {
                             System.out.println("Repository already has keypair.");
                             return;
                         }
-                        ECKey key = new ECKey();
-                        String publicKey = Hex.toHexString(key.getPubKey());
-                        String privateKey = Hex.toHexString(key.getPrivKeyBytes());
-                        // Encrypt: private key -(hex decode)-> private key bytes -(encrypt with rsa public key)->  encrypt bytes -(hex encode)-> hex encrypt
-                        // Decrypt: hex encrypt -(hex decode)-> encrypt bytes     -(decrypt with rsa private key)-> private key bytes -(hex encode) private key
-                        String privateKeyEncryptByOwnerRsaPubKey = Hex.toHexString(
-                                RSAHelper.encrypt(
-                                        Hex.decode(privateKey),
-                                        RSAHelper.getPublicKeyFromHex(HitHelper.getRsaPubKey())
-                                ));
-                        projectInfoFile.setRepoPubKey(publicKey);
-                        projectInfoFile.setRepoPriKey(privateKeyEncryptByOwnerRsaPubKey);
-                        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
-                            String memberPubKey = ti.getMemberPubKeyRsa();
-                            String privateKeyEncryptByMemberRsaPubKey = RSAHelper.encrypt(privateKey, RSAHelper.getPublicKeyFromHex(memberPubKey));
-                            ti.setMemberRepoPriKey(privateKeyEncryptByMemberRsaPubKey);
-                        }
-                        GitHelper.updateWholeHitRepository(projectDir, projectInfoFile);
+                        HitHelper.addKeyPair(projectDir, projectInfoFile);
                         System.out.println("Repository keypair has updated.");
                         return;
                     }
@@ -266,134 +334,211 @@ public class Main {
                             System.out.println("Repository is public without keypair.");
                             return;
                         }
-                        projectInfoFile.setRepoPubKey(null);
-                        projectInfoFile.setRepoPriKey(null);
-                        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
-                            ti.setMemberRepoPriKey(null);
-                        }
-                        GitHelper.updateWholeHitRepository(projectDir, projectInfoFile);
+                        HitHelper.removeKeyPair(projectDir, projectInfoFile);
                         System.out.println("Repository keypair has removed.");
                         return;
                     }
                     if (HitHelper.ACTION_renew.equals(operation)) {
-                        ECKey key = new ECKey();
-                        String publicKey = Hex.toHexString(key.getPubKey());
-                        String privateKey = Hex.toHexString(key.getPrivKeyBytes());
-                        String privateKeyEncryptByOwnerRsaPubKey = Hex.toHexString(
-                                RSAHelper.encrypt(
-                                        Hex.decode(privateKey),
-                                        RSAHelper.getPublicKeyFromHex(HitHelper.getRsaPubKey())
-                                ));
-                        projectInfoFile.setRepoPubKey(publicKey);
-                        projectInfoFile.setRepoPriKey(privateKeyEncryptByOwnerRsaPubKey);
-                        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
-                            String memberPubKey = ti.getMemberPubKeyRsa();
-                            String privateKeyEncryptByMemberRsaPubKey = RSAHelper.encrypt(privateKey, RSAHelper.getPublicKeyFromHex(memberPubKey));
-                            ti.setMemberRepoPriKey(privateKeyEncryptByMemberRsaPubKey);
-                        }
-                        GitHelper.updateWholeHitRepository(projectDir, projectInfoFile);
+                        HitHelper.addKeyPair(projectDir, projectInfoFile);
                         System.out.println("Repository keypair has renewed.");
                         return;
                     }
                     {// print team member info.
-                        printMemberInfo(projectInfoFile);
+                        HitHelper.printKeyPairInfo(projectInfoFile);
                     }
                     return;
                 }
             }
+
+            System.out.println(HELP_REPO);
+            return;
+        } else if (args != null && args.length > 0 && "contract".equals(args[0])) {
+            File projectDir = null;
+            {
+                String workDir = System.getProperty("git_work_tree");
+                if (workDir == null) {
+                    workDir = ".";
+                }
+                projectDir = new File(workDir + "/.git");
+            }
+            if (projectDir == null || !projectDir.exists()) {
+                System.err.println(projectDir.getAbsolutePath() + " is invalid git dir.");
+                System.exit(1);
+            }
+            LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
+            list.poll();
+            if (list.isEmpty()) {
+                list.add(HitHelper.TYPE_help);
+            }
+            // read  : Operation=repositoryName|repositoryAddress|owner|delegator|authedAccounts|authedAccountList|authedAccountSize|hasTeamMember|teamMemberAtIndex
+            // write : Operation=init|initWithDelegator|updateRepositoryName|updateRepositoryAddress|addTeamMember|removeTeamMember|changeOwner|delegateTo
+            // deploy: Operation=deploy
+            String operation = list.poll();// read, write, deploy, help
+            String gasLimitStr = list.poll();// as arg0 for read
+            String gweiStr = list.poll();//
+            String arg0 = list.poll();
+            String arg1 = list.poll();
+            String arg2 = list.poll();
+            if (HitHelper.TYPE_help.equals(operation)) {
+                System.out.println(HELP_CONTRACT);
+                return;
+            }
+            ProjectInfoFile projectInfoFile = HitHelper.getProjectInfoFile(projectDir);
+            RepositoryContractEthereumApi api = RepositoryContractEthereumService.getApi();
+            String fromAddress = HitHelper.getAccountAddress();
+            String contractAddress = projectInfoFile.getRepoAddress();
+            if ("repositoryName".equals(operation)) {
+                String result = api.readRepositoryName(fromAddress, contractAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("repositoryAddress".equals(operation)) {
+                String result = api.readRepositoryAddress(fromAddress, contractAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("owner".equals(operation)) {
+                String result = api.readOwner(fromAddress, contractAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("delegator".equals(operation)) {
+                String result = api.readDelegator(fromAddress, contractAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("authedAccounts".equals(operation)) {
+                boolean result = api.readAuthedAccounts(fromAddress, contractAddress, arg0 = gasLimitStr);
+                System.out.println(result);
+                return;
+            }
+            if ("authedAccountList".equals(operation)) {
+                String result = api.readAuthedAccountList(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
+                System.out.println(result);
+                return;
+            }
+            if ("authedAccountSize".equals(operation)) {
+                int result = api.readAuthedAccountSize(fromAddress, contractAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("hasTeamMember".equals(operation)) {
+                boolean result = api.readHasTeamMember(fromAddress, contractAddress, arg0 = gasLimitStr);
+                System.out.println(result);
+                return;
+            }
+            if ("teamMemberAtIndex".equals(operation)) {
+                String result = api.readTeamMemberAtIndex(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
+                System.out.println(result);
+                return;
+            }
+            //
+            long gasLimit = NumberHelper.getLong(gasLimitStr, 0);
+            long gWei = NumberHelper.getLong(gweiStr, 0);
+            if ("deploy".equals(operation)) {
+                String result = api.deployContract(HitHelper.getAccountPriKeyWithPasswordInput(), gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("init".equals(operation)) {
+                String result = api.writeInit(arg0, arg1, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("initWithDelegator".equals(operation)) {
+                String result = api.writeInitWithDelegator(arg0, arg1, arg2, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("updateRepositoryName".equals(operation)) {
+                String result = api.writeUpdateRepositoryName(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("updateRepositoryAddress".equals(operation)) {
+                String result = api.writeUpdateRepositoryAddress(api.readRepositoryAddress(fromAddress, contractAddress), arg1, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("addTeamMember".equals(operation)) {
+                String result = api.writeAddTeamMember(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("removeTeamMember".equals(operation)) {
+                String result = api.writeRemoveTeamMember(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("changeOwner".equals(operation)) {
+                String result = api.writeChangeOwner(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("delegateTo".equals(operation)) {
+                String result = api.writeDelegateTo(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+
+            System.out.println(HELP_CONTRACT);
+            return;
+        } else if (args != null && args.length > 0 && "token".equals(args[0])) {
+            File projectDir = null;
+            {
+                String workDir = System.getProperty("git_work_tree");
+                if (workDir == null) {
+                    workDir = ".";
+                }
+                projectDir = new File(workDir + "/.git");
+            }
+            if (projectDir == null || !projectDir.exists()) {
+                System.err.println(projectDir.getAbsolutePath() + " is invalid git dir.");
+                System.exit(1);
+            }
+            LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
+            list.poll();
+            if (list.isEmpty()) {
+                list.add(HitHelper.TYPE_help);
+            }
+            String operation = list.poll();// readToken, readHitToken, readContactToken, requestTestToken
+            String accoutAddress = list.poll();
+            String contractAddress = list.size() > 0 ? (accoutAddress + (accoutAddress = "")) : list.poll();
+            String functionName = list.poll();
+            if (list.size() > 0) {
+                accoutAddress = list.poll();
+            }
+            if (HitHelper.TYPE_help.equals(operation)) {
+                System.out.println(HELP_TOKEN);
+                return;
+            }
+            TokenEthereumApi api = TokenEthereumService.getApi();
+            accoutAddress = StringUtils.defaultString(accoutAddress, HitHelper.getAccountAddress());
+            if ("readToken".equals(operation)) {
+                String result = api.readToken(accoutAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("readHitToken".equals(operation)) {
+                String result = api.readHitToken(accoutAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("readContactToken".equals(operation)) {
+                String result = api.readContactToken(accoutAddress, contractAddress, functionName);
+                System.out.println(result);
+                return;
+            }
+            if ("requestTestToken".equals(operation)) {
+                String result = api.requestTestToken(accoutAddress);
+                System.out.println(result);
+                return;
+            }
+            System.out.println(HELP_TOKEN);
+            return;
         } else {
             Class<?> main = Class.forName("org.eclipse.jgit.pgm.Main");
             main.getMethod(HitHelper.TYPE_main, String[].class).invoke(null, new Object[]{args});
         }
-    }
-
-    private static void printMemberInfo(ProjectInfoFile projectInfoFile) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Team members: \n");
-        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
-            sb.append(StringUtils.rightPad(ti.getMember(), 20)).append(' ')
-                    .append(StringUtils.rightPad(ti.getMemberAddressEcc(), 45)).append(' ')
-                    .append(ti.getMemberPubKeyRsa()).append('\n');
-        }
-        System.out.println(sb);
-    }
-
-    private static boolean removeMember(File projectDir, String member, String memberAddressEcc, ProjectInfoFile projectInfoFile) {
-        ProjectInfoFile.TeamInfo teamInfo = null;
-        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
-            if (StringUtils.equals(ti.getMember(), member)) {
-                teamInfo = ti;
-                break;
-            }
-        }
-        if (teamInfo == null) {
-            System.out.println("No member found.");
-            return true;
-        }
-        projectInfoFile.getMembers().remove(teamInfo);
-        String result = EthereumHelper.removeTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc);
-        if (EthereumHelper.isError(result)) {
-            System.err.println("Remove member error:" + result);
-            System.exit(1);
-        }
-        if (!GitHelper.updateHitRepositoryProjectInfoFile(projectDir, projectInfoFile)) {
-            System.err.println("Update project info file error.");
-            System.exit(1);
-        }
-        System.out.println("Member has removed in the contract.");
-        return true;
-    }
-
-    private static void addMember(File projectDir, String member, String memberPubKeyRsa, String memberAddressEcc, ProjectInfoFile projectInfoFile) {
-        if (StringUtils.isBlank(member) || StringUtils.isBlank(memberPubKeyRsa) || StringUtils.isBlank(memberAddressEcc)) {
-            System.err.println("Can't not execute command.");
-            System.exit(1);
-        }
-        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
-            if (StringUtils.equals(ti.getMember(), member) || StringUtils.equals(ti.getMemberAddressEcc(), memberAddressEcc)) {
-                System.out.println("Member is exists.");
-                return;
-            }
-        }
-        if (projectInfoFile.isPrivate()) {
-            projectInfoFile.addMemberPrivate(member, memberPubKeyRsa, memberAddressEcc, HitHelper.getRsaPriKeyWithPasswordInput());
-        } else {
-            projectInfoFile.addMemberPublic(member, memberPubKeyRsa, memberAddressEcc);
-        }
-        if (EthereumHelper.hasTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc)) {
-            System.out.println("Member is exists in the contract.");
-            return;
-        }
-        String result = EthereumHelper.addTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc);
-        if (EthereumHelper.isError(result)) {
-            System.err.println("Add member error:" + result);
-            System.exit(1);
-        }
-        if (!GitHelper.updateHitRepositoryProjectInfoFile(projectDir, projectInfoFile)) {
-            System.err.println("Update project info file error.");
-            System.exit(1);
-        }
-        System.out.println("Member has added in the contract.");
-        return;
-    }
-
-    private static ProjectInfoFile getProjectInfoFile(File projectDir) {
-        ProjectInfoFile projectInfoFile = null;
-        if (GitHelper.existProjectInfoFile(projectDir)) {
-            projectInfoFile = GitHelper.readProjectInfoFile(projectDir);
-        }
-        if (projectInfoFile == null) {
-            System.err.println(projectDir.getAbsolutePath() + " is invalid hit repository.");
-            System.exit(1);
-        }
-        if (!StringUtils.equals(HitHelper.getAccountAddress(), projectInfoFile.getOwnerAddressEcc())) {
-            System.err.println("Only owner can change this settings.");
-            System.exit(1);
-        }
-        if (!projectInfoFile.verify(null)) {
-            System.err.println("Project info file is not verify.");
-            System.exit(1);
-        }
-        return projectInfoFile;
     }
 }
