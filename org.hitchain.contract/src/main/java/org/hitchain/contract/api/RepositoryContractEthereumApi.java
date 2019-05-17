@@ -101,6 +101,13 @@ public interface RepositoryContractEthereumApi extends ContractApi {
      */
     String readTeamMemberAtIndex(String fromAddress, String contractAddress, int index);
 
+    /**
+     * Get the repository history address.
+     *
+     * @param contractAddress contract address
+     * @return repository address list
+     */
+    String readHistoryRepositoryAddress(String contractAddress);
 
     /**
      * Initialize the contract.

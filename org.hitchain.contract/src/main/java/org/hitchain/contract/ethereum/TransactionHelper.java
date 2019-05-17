@@ -9,22 +9,27 @@
 package org.hitchain.contract.ethereum;
 
 import org.apache.commons.lang3.StringUtils;
-import org.iff.infra.util.Assert;
-import org.iff.infra.util.GsonHelper;
-import org.iff.infra.util.JsonHelper;
+import org.iff.infra.util.*;
+import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeReference;
+import org.web3j.abi.datatypes.Address;
+import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Type;
+import org.web3j.abi.datatypes.Utf8String;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.ECKeyPair;
+import org.web3j.crypto.Hash;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.utils.Convert;
+import org.web3j.utils.Numeric;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * FunctionHelper
@@ -41,6 +46,18 @@ public class TransactionHelper {
 
     public static FunctionResult result() {
         return new FunctionResult();
+    }
+
+    public static ParameterType type() {
+        return new ParameterType();
+    }
+
+    public static ParameterType type(List<Type> types) {
+        ParameterType parameterType = new ParameterType();
+        for (Type type : types) {
+            parameterType.add(type.getClass());
+        }
+        return parameterType;
     }
 
     public static Map<String, Object> parseData(String data) {
@@ -141,6 +158,125 @@ public class TransactionHelper {
         }
     }
 
+    public static void main(String[] args) {
+        RequestHelper.RequestResult result = RequestHelper.get("http://api-ropsten.etherscan.io/api",
+                MapHelper.toMap(
+                        "module", "account",
+                        "action", "txlist",
+                        "address", "0x8b20bbe008d7b3dc0ad8d0a74c9cdf7772b0eee1",
+                        "startblock", "0",
+                        "endblock", "99999999",
+                        "page", "1",
+                        "offset", "100",
+                        "sort", "desc",
+                        "apikey", "YourApiKeyToken"
+                ),
+                Collections.EMPTY_MAP);
+        // Result:
+        // {"status":"1","message":"OK","result":[
+        //  {"blockNumber":"5606491","timeStamp":"1557974025",
+        //   "hash":"0x4dcd95b99c1afc14921584b63f7f1e24d83641c5f96b92b3c3cd371aba5f61eb","nonce":"17",
+        //   "blockHash":"0x6cfaf0d3e7210898c580e59d99ce2671b98dec1207498b2be2317e9b11297598","transactionIndex":"0",
+        //   "from":"0x8ab9cff82197b9673ec6e26c41176798f88f2cb5","to":"0x8b20bbe008d7b3dc0ad8d0a74c9cdf7772b0eee1",
+        //   "value":"0","gas":"500000","gasPrice":"10000000000","isError":"0","txreceipt_status":"1",
+        //   "input":"0x2d3156f6000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000002e516d53444653434d443153745a783947796e596f717974596e34556b31506a315031746b7936366b6770346d736f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002e516d64506e7a7738324357714c33585775677139434e66323759625242624d31473667343257674c43516a484b4d000000000000000000000000000000000000",
+        //   "contractAddress":"","cumulativeGasUsed":"47709","gasUsed":"47709","confirmations":"241"}]
+        Map<String, Object> bodyAsJson = result.getBodyAsJson();
+        System.out.println(decodeInput(bodyAsJson, new Function(
+                "updateRepositoryAddress",
+                args().string("-").string("-").get(),
+                result().add(Utf8String.class).add(Utf8String.class).get())));
+        System.out.println(new Address("0x0"));
+    }
+
+    public static int transactionResultSize(Map transactions) {
+        if (transactions == null || transactions.isEmpty()) {
+            return 0;
+        }
+        List<Map> results = (List<Map>) transactions.get("result");
+        return results != null ? results.size() : 0;
+    }
+
+    public static List<Tuple.Four<Object/*result*/, String/*methodName*/, List<Type>/*inputParameter*/, String/*from*/, Date/*timestamp*/>> decodeInput(Map transactions, Function function) {
+        List<Tuple.Four<Object, String, List<Type>, String, Date>> list = new ArrayList<>();
+        if (transactions == null || transactions.isEmpty()) {
+            return list;
+        }
+        List<Map> results = (List<Map>) transactions.get("result");
+        if (results == null || results.isEmpty()) {
+            return list;
+        }
+        String functionId = buildMethodId(buildMethodSignature(function.getName(), function.getInputParameters()));
+        for (Map result : results) {
+            String rawInput = (String) result.get("input");
+            String from = (String) result.get("from");
+            String to = (String) result.get("to");
+            String timeStamp = (String) result.get("timeStamp");
+            boolean isSuccess = "0".equals(result.get("isError"));
+            boolean txReceiptStatus = "1".equals(result.get("txreceipt_status"));
+            if (!(isSuccess && txReceiptStatus && StringUtils.isNotBlank(to))) {
+                continue;
+            }
+            String methodId = rawInput.substring(0, 10);
+            if (!StringUtils.equals(functionId, methodId)) {
+                continue;
+            }
+            Tuple.Two<Object, String, List<Type>> two = decodeInput(rawInput, function);
+            list.add(new Tuple.Four<>(two.first(), two.second(), from, new Date(NumberHelper.getLong(timeStamp, 0) * 1000)));
+        }
+        return list;
+    }
+
+    /**
+     * decode transaction raw data to method and inputParameter data.
+     *
+     * @param input    the transaction raw input
+     * @param function the contract function, NOTE: the outputParameters is not use, can set to any value.
+     * @return Tuple.Two<Object:result                                                               ,                                                                                                                               String:methodName                                                               ,                                                                                                                               List                                                               <                                                               Type>:inputParameter>
+     */
+    public static Tuple.Two<Object/*result*/, String/*methodName*/, List<Type>/*inputParameter*/> decodeInput(String input, Function function) {
+        String methodId = input.substring(0, 10);
+        input = input.substring(10);
+        //
+        List<Type> types = FunctionReturnDecoder.decode(input, type(function.getInputParameters()).get());
+        //        String methodSignature = buildMethodSignature("updateRepositoryAddress", args().string("-").string("-").get());
+        //        String methodId = buildMethodId(methodSignature);
+        //        System.out.println(methodId);
+        //
+        //        String method = inputData.substring(0,10);
+        //        System.out.println(method);
+        //        String to = inputData.substring(10,74);
+        //        String value = inputData.substring(74);
+        //        Method refMethod = TypeDecoder.class.getDeclaredMethod("decode",String.class,int.class,Class.class);
+        //        refMethod.setAccessible(true);
+        //        Address address = (Address)refMethod.invoke(null,to,0,Address.class);
+        //        System.out.println(address.toString());
+        //        Uint256 amount = (Uint256) refMethod.invoke(null,value,0,Uint256.class);
+        //        System.out.println(amount.getValue());
+        //
+        //FunctionEncoder.encode(function);
+        //String functionId = buildMethodId(buildMethodSignature(function.getName(), function.getInputParameters()));
+        return new Tuple.Two<>(function.getName(), types);
+    }
+
+    public static String buildMethodSignature(String methodName, List<Type> parameters) {
+        StringBuilder result = new StringBuilder();
+        result.append(methodName);
+        result.append("(");
+        String params = parameters.stream()
+                .map(Type::getTypeAsString)
+                .collect(Collectors.joining(","));
+        result.append(params);
+        result.append(")");
+        return result.toString();
+    }
+
+    public static String buildMethodId(String methodSignature) {
+        byte[] input = methodSignature.getBytes();
+        byte[] hash = Hash.sha3(input);
+        return Numeric.toHexString(hash).substring(0, 10);
+    }
+
     /**
      * 构造函数参数。
      */
@@ -228,6 +364,26 @@ public class TransactionHelper {
 
         public List<TypeReference<?>> get() {
             return resultType;
+        }
+    }
+
+    /**
+     * 输出参数类型。
+     */
+    public static class ParameterType {
+        private List<TypeReference<Type>> types = new ArrayList();
+
+        public ParameterType add(Class<? extends Type> cls) {
+            types.add(new TypeReference<Type>() {
+                public java.lang.reflect.Type getType() {
+                    return cls;
+                }
+            });
+            return this;
+        }
+
+        public List<TypeReference<Type>> get() {
+            return types;
         }
     }
 }
