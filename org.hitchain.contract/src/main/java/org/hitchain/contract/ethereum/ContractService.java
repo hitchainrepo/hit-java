@@ -48,9 +48,6 @@ import java.util.Map;
  */
 public class ContractService implements ContractApi {
 
-    public static final String PRI_KEY = "bzFA/6ijlDQjSc+AAUUIqNylva8/NdVnQ60j+quuRA7zeRA+uHRKwSWabG8C6oNCPqjnfO9M+nzOnYaxFpqC/YujaqbB7qRuWWYWONVR/qdEP4O5j3YW7rwEy9SkQKzfMsh2dodwYryHA5+BmYhk3jVKZgUuqE+qQVVHaesyAD8=";
-    public static final String PUB_KEY = "0x91C02c0a17A14c1acbf34Ea105EDe4Ffef98FF5b";
-
     private static Web3j web3j = null;
 
     public static Web3j getWeb3j() {

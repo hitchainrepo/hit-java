@@ -81,9 +81,11 @@ public class HitHelper {
 
     public static Map<String/*section*/, Map<String/*name*/, String/*value*/>> hitConfig() {
         Map<String/*section*/, Map<String/*name*/, String/*value*/>> map = new LinkedHashMap<>();
-        System.getProperties().put("HitCfg", map);
+        {// set hit config to system.
+            System.getProperties().put("HitCfg", map);
+        }
         String content = null;
-        try {
+        try {// read hit config from file.
             File file = new File(FILE_HIT_CONFIG);
             if (!file.exists()) {
                 return (hitConfig = map);
@@ -95,6 +97,7 @@ public class HitHelper {
         if (StringUtils.isBlank(content)) {
             return (hitConfig = map);
         }
+        // read hit config by line
         String[] lines = StringUtils.split(content, '\n');
         String type = null;
         for (String line : lines) {
@@ -102,10 +105,12 @@ public class HitHelper {
                 continue;
             }
             line = line.trim();
+            // this is the section start, starts with "[" and ends with "]"
             if (line.startsWith("[")) {
                 type = line.substring(1, line.length() - 1);
                 continue;
             }
+            // the key-value line.
             int indexOf = line.indexOf('=');
             if (indexOf < 1 || StringUtils.isBlank(type)) {
                 throw new RuntimeException("Hit config has wrong format!");
@@ -165,7 +170,7 @@ public class HitHelper {
             two.result(kv.get(NAME_default));
             return two;
         }
-        if (TYPE_storage.equals(section) || TYPE_repository.equals(section) || TYPE_chain.equals(section) || TYPE_main.equals(section)) {
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_main
             if (!kv.containsKey(name)) {
                 return null;
             }
@@ -173,7 +178,6 @@ public class HitHelper {
             two.result(kv.get(NAME_default));
             return two;
         }
-        return null;
     }
 
     public static boolean addByName(Map<String/*section*/, Map<String/*name*/, String/*value*/>> config, String section, String name, String value1, String value2) {
@@ -206,7 +210,7 @@ public class HitHelper {
             kv.put(pri, value2);
             return true;
         }
-        if (TYPE_storage.equals(section) || TYPE_repository.equals(section) || TYPE_chain.equals(section) || TYPE_main.equals(section)) {
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_main
             if (NAME_default.equals(name)) {
                 kv.put(name, value1);
                 return true;
@@ -221,8 +225,6 @@ public class HitHelper {
             kv.put(name, value1);
             return true;
         }
-        System.out.println("Hit config can not find the " + section + " " + name + "!");
-        return false;
     }
 
     public static boolean removeByName(Map<String/*section*/, Map<String/*name*/, String/*value*/>> config, String section, String name) {
@@ -245,15 +247,13 @@ public class HitHelper {
             }
             return true;
         }
-        if (TYPE_storage.equals(section) || TYPE_repository.equals(section) || TYPE_chain.equals(section) || TYPE_main.equals(section)) {
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_main
             kv.remove(name);
             if (name.equals(StringUtils.trim(kv.get(NAME_default)))) {
                 kv.put(NAME_default, "");
             }
             return true;
         }
-        System.out.println("Hit config can not find the " + section + " " + name + "!");
-        return false;
     }
 
     public static boolean testPassword(String password) {
@@ -265,24 +265,56 @@ public class HitHelper {
         return matches;
     }
 
-    public static boolean createHitConfig(String password) {
+    public static boolean createHitConfig() {
         if (!(getHitConfig().isEmpty() || getByName(getHitConfig(), TYPE_main, NAME_default) == null)) {
             System.out.println("Hit config file is exists!");
             return false;
         }
-        if (!testPassword(password)) {
-            return false;
-        }
+        System.err.println();
+        String password = createPassword();
         String mnemonic = WalletHelper.stringToMnemonic(password);
         System.out.println(StringUtils.repeat('!', 50));
         System.out.println("Please write down the mnemonic words(for recover your password)!!! : \n" + mnemonic);
         System.out.println(StringUtils.repeat('!', 50));
         String sign = WalletHelper.sign(password);
-        Map<String, String> kv = getHitConfig().get(TYPE_main);
-        if (kv == null) {
-            getHitConfig().put(TYPE_main, kv = new LinkedHashMap<>());
+        {//init main
+            Map<String, String> kv = getHitConfig().get(TYPE_main);
+            if (kv == null) {
+                getHitConfig().put(TYPE_main, kv = new LinkedHashMap<>());
+            }
+            kv.put(NAME_default, sign);
         }
-        kv.put(NAME_default, sign);
+        {//init account
+            Map<String, String> kv = getHitConfig().get(TYPE_account);
+            if (kv == null) {
+                accountAdd("main", null);
+            }
+        }
+        {//init rsa
+            Map<String, String> kv = getHitConfig().get(TYPE_rsa);
+            if (kv == null) {
+                rsaAdd("main", null, null);
+            }
+        }
+        {//init storage
+            Map<String, String> kv = getHitConfig().get(TYPE_storage);
+            if (kv == null) {
+                storageAdd("main", "121.40.127.45");
+            }
+        }
+        {//init repository
+            Map<String, String> kv = getHitConfig().get(TYPE_repository);
+            if (kv == null) {
+                repositoryAdd("main", "https://121.40.127.45:1443");
+            }
+        }
+        {//init chain
+            Map<String, String> kv = getHitConfig().get(TYPE_chain);
+            if (kv == null) {
+                chainAdd("test", "https://ropsten.infura.io");
+                chainAdd("main", "https://mainnet.infura.io/0x7995ab36bB307Afa6A683C24a25d90Dc1Ea83566");
+            }
+        }
         return true;
     }
 
@@ -293,7 +325,7 @@ public class HitHelper {
         if (getHitConfig().isEmpty()) {
             if (createNew) {
                 System.out.println("Hit config is empty, try to create new.");
-                createHitConfig(password);
+                createHitConfig();
                 hitConfig();
                 return true;
             } else {
@@ -339,16 +371,11 @@ public class HitHelper {
         System.out.println("default name:" + two.result());
     }
 
-    public static boolean accountAdd(String name, String priKey, String password) {
+    public static boolean accountAdd(String name, String priKey) {
         if (!isValidName(name)) {
             return false;
         }
-        if (!isValidPassword(password)) {
-            return false;
-        }
-        if (!testHitConfigPassword(password, true)) {
-            return false;
-        }
+        String password = readPassword();
         if (StringUtils.isBlank(priKey)) {
             System.out.println("Create new account.");
             Tuple.Two<Object, String, String> two = WalletHelper.createAccount(password);
@@ -394,16 +421,11 @@ public class HitHelper {
         System.out.println("default name:" + two.result());
     }
 
-    public static boolean rsaAdd(String name, String priKey, String pubKey, String password) {
+    public static boolean rsaAdd(String name, String priKey, String pubKey) {
         if (!isValidName(name)) {
             return false;
         }
-        if (!isValidPassword(password)) {
-            return false;
-        }
-        if (!testHitConfigPassword(password, true)) {
-            return false;
-        }
+        String password = readPassword();
         if (StringUtils.isBlank(priKey)) {
             System.out.println("Create new rsa.");
             Tuple.Two<Object, String, String> two = WalletHelper.createRsa(password);
@@ -762,6 +784,44 @@ public class HitHelper {
         }
         if (StringUtils.isBlank(password)) {
             System.err.println("Password is incorrect!");
+            System.exit(0);
+            return null;
+        }
+        {
+            passwordCache = WalletHelper.encryptWithPasswordHex(password, passwordEncrypt);
+        }
+        return password;
+    }
+
+    public static String createPassword() {
+        String password = "";
+        Console console = System.console();
+        if (console == null) {
+            System.err.println("Couldn't get Console instance, password input will show in console!");
+        }
+        if (console != null) {
+            char passwordArray[] = console.readPassword("Enter hit config password: ");
+            password = new String(passwordArray);
+        } else {
+            System.err.println("Enter hit config password:");
+            password = readFromSystemInput();
+        }
+        {//verify password.
+            String rePassword = "";
+            if (console != null) {
+                char passwordArray[] = console.readPassword("Enter hit config password again: ");
+                rePassword = new String(passwordArray);
+            } else {
+                System.err.println("Enter hit config password again:");
+                rePassword = readFromSystemInput();
+            }
+            if (!StringUtils.equals(password, rePassword)) {
+                System.err.println("Password is incorrect!");
+                System.exit(0);
+                return null;
+            }
+        }
+        if (!testPassword(password)) {
             System.exit(0);
             return null;
         }

@@ -7,7 +7,6 @@
  ******************************************************************************/
 package org.hitchain.core;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.Repository;
@@ -18,11 +17,11 @@ import org.hitchain.contract.ethereum.TokenEthereumService;
 import org.hitchain.hit.api.ProjectInfoFile;
 import org.hitchain.hit.util.HitHelper;
 import org.hitchain.hit.util.WalletHelper;
+import org.iff.infra.util.MapHelper;
 import org.iff.infra.util.NumberHelper;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.LinkedList;
+import java.util.*;
 
 /**
  * Main
@@ -65,10 +64,10 @@ import java.util.LinkedList;
 public class Main {
     public static final String HELP_CFG = "" +
             "hit cfg help\n" +
-            "hit cfg create     password\n" +
+            "hit cfg create\n" +
             "hit cfg recover    password\n" +
-            "hit cfg account    add name [priKey]        password\n" +
-            "hit cfg rsa        add name [priKey pubKey] password\n" +
+            "hit cfg account    add name [priKey]\n" +
+            "hit cfg rsa        add name [priKey pubKey]\n" +
             "hit cfg storage    add name url\n" +
             "hit cfg repository add name url\n" +
             "hit cfg chain      add name url(https://ropsten.infura.io, https://mainnet.infura.io/0x7995ab36bB307Afa6A683C24a25d90Dc1Ea83566)\n" +
@@ -92,6 +91,7 @@ public class Main {
             "hit contract authedAccountSize\n" +
             "hit contract hasTeamMember            memberAddress\n" +
             "hit contract teamMemberAtIndex        index\n" +
+            "hit contract historyRepositoryAddress \n" +
             "hit contract deploy                   gasLimit(5000000)  gWei\n" +
             "hit contract init                     gasLimit( 500000)  gWei  ownerAddress repositoryName\n" +
             "hit contract initWithDelegator        gasLimit( 500000)  gWei  ownerAddress repositoryName delegatorAddress\n" +
@@ -110,11 +110,25 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
         //System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/hello");
+        //args = new String[]{"contract","historyRepositoryAddress"};
         //
-        String[] needPassword = new String[]{"cfg", "repo", "contract", "token", "push", "fetch"};
-        //
-        if (!HitHelper.getHitConfig().isEmpty() && args.length > 0 && ArrayUtils.contains(needPassword, args[0])) {
-            HitHelper.getAccountPriKeyWithPasswordInput();
+        //this just pre-input password.
+        {
+            Map<String, Set<String>> needPasswords = MapHelper.toMap(
+                    "cfg", new HashSet<>(Arrays.asList("account", "rsa")),
+                    "repo", new HashSet<>(Arrays.asList("keypair", "member")),
+                    "contract", new HashSet<>(Arrays.asList("deploy", "init", "initWithDelegator", "updateRepositoryName", "updateRepositoryAddress", "addTeamMember", "removeTeamMember", "changeOwner", "delegateTo")),
+                    "push", new HashSet<>(),
+                    "fetch", new HashSet<>(),
+                    "clone", new HashSet<>()
+            );
+            LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
+            if (!HitHelper.getHitConfig().isEmpty() && args.length > 0) {
+                Set<String> strings = needPasswords.get(list.poll());
+                if (strings != null && (strings.isEmpty() || strings.contains(list.poll()))) {
+                    HitHelper.getAccountPriKeyWithPasswordInput();
+                }
+            }
         }
         //
         if (args != null && args.length > 0 && "help".equals(args[0])) {
@@ -142,8 +156,7 @@ public class Main {
                 return;
             }
             if (HitHelper.TYPE_create.equals(type)) {
-                String password = operation;
-                if (HitHelper.createHitConfig(password)) {
+                if (HitHelper.createHitConfig()) {
                     HitHelper.hitConfigToFile(HitHelper.getHitConfig());
                 }
                 return;
@@ -151,8 +164,7 @@ public class Main {
             if (HitHelper.TYPE_account.equals(type)) {
                 if (HitHelper.ACTION_add.equals(operation)) {
                     String pri = StringUtils.isBlank(v2) ? null : v1;
-                    String password = pri == null ? v1 : v2;
-                    if (HitHelper.accountAdd(name, pri, password)) {
+                    if (HitHelper.accountAdd(name, pri)) {
                         HitHelper.hitConfigToFile(HitHelper.getHitConfig());
                     }
                     return;
@@ -176,8 +188,7 @@ public class Main {
                 if (HitHelper.ACTION_add.equals(operation)) {
                     String pri = StringUtils.isBlank(v2) ? null : v1;
                     String pub = StringUtils.isBlank(v2) ? null : v2;
-                    String password = pri == null ? v1 : v3;
-                    if (HitHelper.rsaAdd(name, pri, pub, password)) {
+                    if (HitHelper.rsaAdd(name, pri, pub)) {
                         HitHelper.hitConfigToFile(HitHelper.getHitConfig());
                     }
                     return;
@@ -429,6 +440,11 @@ public class Main {
             }
             if ("teamMemberAtIndex".equals(operation)) {
                 String result = api.readTeamMemberAtIndex(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
+                System.out.println(result);
+                return;
+            }
+            if ("historyRepositoryAddress".equals(operation)) {
+                String result = api.readHistoryRepositoryAddress(contractAddress);
                 System.out.println(result);
                 return;
             }
