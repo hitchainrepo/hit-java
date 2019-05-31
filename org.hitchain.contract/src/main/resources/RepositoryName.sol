@@ -1,8 +1,9 @@
 pragma solidity 0.5.6;
 
 /**
+ * @author Tyler Chen
  * @title RepositoryName
- * @dev The contract to save the repository informations.
+ * @dev The contract to save the repository informations, last update: 2019-01-01, version: 0.0.1.
  */
 contract RepositoryName {
     /**
