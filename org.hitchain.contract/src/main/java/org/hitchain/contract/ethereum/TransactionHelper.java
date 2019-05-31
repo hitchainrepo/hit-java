@@ -9,13 +9,14 @@
 package org.hitchain.contract.ethereum;
 
 import org.apache.commons.lang3.StringUtils;
+import org.bouncycastle.util.encoders.Hex;
 import org.iff.infra.util.*;
 import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeReference;
-import org.web3j.abi.datatypes.Address;
-import org.web3j.abi.datatypes.Function;
-import org.web3j.abi.datatypes.Type;
-import org.web3j.abi.datatypes.Utf8String;
+import org.web3j.abi.Utils;
+import org.web3j.abi.datatypes.*;
+import org.web3j.abi.datatypes.generated.AbiTypes;
+import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.ECKeyPair;
 import org.web3j.crypto.Hash;
@@ -232,7 +233,7 @@ public class TransactionHelper {
      *
      * @param input    the transaction raw input
      * @param function the contract function, NOTE: the outputParameters is not use, can set to any value.
-     * @return Tuple.Two<Object:result                                                               ,                                                                                                                               String:methodName                                                               ,                                                                                                                               List                                                               <                                                               Type>:inputParameter>
+     * @return Tuple.Two{methodName, inputParameter}
      */
     public static Tuple.Two<Object/*result*/, String/*methodName*/, List<Type>/*inputParameter*/> decodeInput(String input, Function function) {
         String methodId = input.substring(0, 10);
@@ -277,6 +278,13 @@ public class TransactionHelper {
         return Numeric.toHexString(hash).substring(0, 10);
     }
 
+    public static Class<? extends Type> getType(String type) {
+        type = StringUtils.defaultString(type, "");
+        type = StringUtils.equalsIgnoreCase(type, "Utf8String") ? "string" : type;
+        type = StringUtils.equalsIgnoreCase(type, "DynamicBytes") ? "bytes" : type;
+        return AbiTypes.getType(StringUtils.lowerCase(type));
+    }
+
     /**
      * 构造函数参数。
      */
@@ -285,45 +293,204 @@ public class TransactionHelper {
         private List<Type> arguments = new ArrayList<Type>();
 
         public FunctionCreator address(String address) {
-            arguments.add(new org.web3j.abi.datatypes.Address(address));
+            arguments.add(new Address(address));
+            return this;
+        }
+
+        public FunctionCreator bool(boolean bool) {
+            arguments.add(new Bool(bool));
+            return this;
+        }
+
+        public FunctionCreator bool(String bool) {
+            arguments.add(new Bool(Boolean.valueOf(bool)));
             return this;
         }
 
         public FunctionCreator string(String content) {
-            arguments.add(new org.web3j.abi.datatypes.Utf8String(content));
+            arguments.add(new Utf8String(content));
+            return this;
+        }
+
+        public FunctionCreator dynamicBytes(byte[] value) {
+            arguments.add(new DynamicBytes(value));
+            return this;
+        }
+
+        public FunctionCreator dynamicBytes(String hex) {
+            arguments.add(new DynamicBytes(Hex.decode(hex)));
+            return this;
+        }
+
+        public FunctionCreator bytes(String bytesName, byte[] value) {
+            try {
+                Class<? extends Type> cls = getType(bytesName);
+                arguments.add(cls.getDeclaredConstructor(byte[].class).newInstance(value));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            return this;
+        }
+
+        public FunctionCreator bytes(String bytesName, String hex) {
+            try {
+                Class<? extends Type> cls = getType(bytesName);
+                arguments.add(cls.getDeclaredConstructor(byte[].class).newInstance(Hex.decode(hex)));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
             return this;
         }
 
         public FunctionCreator uint256(BigInteger amount) {
-            arguments.add(new org.web3j.abi.datatypes.generated.Uint256(amount));
+            arguments.add(new Uint256(amount));
             return this;
         }
 
         public FunctionCreator uint256(String amount) {
-            arguments.add(new org.web3j.abi.datatypes.generated.Uint256(new BigInteger(amount)));
+            arguments.add(new Uint256(new BigInteger(amount)));
             return this;
         }
 
-        public FunctionCreator object(Type type) {
-            arguments.add(type);
+        public FunctionCreator uint(String unintName, BigInteger amount) {
+            try {
+                Class<? extends Type> cls = getType(unintName);
+                arguments.add(cls.getDeclaredConstructor(BigInteger.class).newInstance(amount));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            return this;
+        }
+
+        public FunctionCreator uint(String unintName, String amount) {
+            try {
+                Class<? extends Type> cls = getType(unintName);
+                arguments.add(cls.getDeclaredConstructor(BigInteger.class).newInstance(new BigInteger(amount)));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
             return this;
         }
 
         public FunctionCreator addressArray(List<String> addresses) {
-            arguments.add(new org.web3j.abi.datatypes.DynamicArray<org.web3j.abi.datatypes.Address>(
-                    org.web3j.abi.Utils.typeMap(addresses, org.web3j.abi.datatypes.Address.class)));
+            arguments.add(new DynamicArray(
+                    Address.class,
+                    Utils.typeMap(addresses, Address.class)));
             return this;
         }
 
         public FunctionCreator addressArray(String... addresses) {
-            arguments.add(new org.web3j.abi.datatypes.DynamicArray<org.web3j.abi.datatypes.Address>(
-                    org.web3j.abi.Utils.typeMap(Arrays.asList(addresses), org.web3j.abi.datatypes.Address.class)));
+            arguments.add(new DynamicArray(
+                    Address.class,
+                    Utils.typeMap(Arrays.asList(addresses), Address.class)));
+            return this;
+        }
+
+        public FunctionCreator boolArray(List<Boolean> bools) {
+            arguments.add(new DynamicArray(
+                    Bool.class,
+                    Utils.typeMap(bools, Bool.class)));
+            return this;
+        }
+
+        public FunctionCreator boolArray(boolean... bools) {
+            List<Boolean> value = new ArrayList<>();
+            if (bools != null) {
+                for (boolean bool : bools) {
+                    value.add(bool);
+                }
+            }
+            arguments.add(new DynamicArray(
+                    Bool.class,
+                    Utils.typeMap(value, Bool.class)));
+            return this;
+        }
+
+        public FunctionCreator boolArray(String... bools) {
+            List<Boolean> value = new ArrayList<>();
+            if (bools != null) {
+                for (String bool : bools) {
+                    value.add(Boolean.valueOf(bool));
+                }
+            }
+            arguments.add(new DynamicArray(
+                    Bool.class,
+                    Utils.typeMap(value, Bool.class)));
+            return this;
+        }
+
+        public FunctionCreator stringArray(List<String> addresses) {
+            arguments.add(new DynamicArray(
+                    Address.class,
+                    Utils.typeMap(addresses, Address.class)));
+            return this;
+        }
+
+        public FunctionCreator stringArray(String... addresses) {
+            arguments.add(new DynamicArray(
+                    Address.class,
+                    Utils.typeMap(Arrays.asList(addresses), Address.class)));
+            return this;
+        }
+
+        public FunctionCreator dynamicBytesArray(List<byte[]> bytesList) {
+            arguments.add(new DynamicArray(
+                    DynamicBytes.class,
+                    Utils.typeMap(bytesList, DynamicBytes.class)));
+            return this;
+        }
+
+        public FunctionCreator dynamicBytesArray(byte[]... bytesArray) {
+            arguments.add(new DynamicArray(
+                    DynamicBytes.class,
+                    Utils.typeMap(Arrays.asList(bytesArray), DynamicBytes.class)));
+            return this;
+        }
+
+        public FunctionCreator dynamicBytesArray(String... hexBytesArray) {
+            List<byte[]> value = new ArrayList<>();
+            if (hexBytesArray != null) {
+                for (String hex : hexBytesArray) {
+                    value.add(Hex.decode(hex));
+                }
+            }
+            arguments.add(new DynamicArray(
+                    DynamicBytes.class,
+                    Utils.typeMap(value, DynamicBytes.class)));
+            return this;
+        }
+
+        public FunctionCreator bytesArray(String bytesName, List<byte[]> bytesList) {
+            arguments.add(new DynamicArray(
+                    getType(bytesName),
+                    Utils.typeMap(bytesList, getType(bytesName))));
+            return this;
+        }
+
+        public FunctionCreator bytesArray(String bytesName, byte[]... bytesArray) {
+            arguments.add(new DynamicArray(
+                    getType(bytesName),
+                    Utils.typeMap(Arrays.asList(bytesArray), getType(bytesName))));
+            return this;
+        }
+
+        public FunctionCreator bytesArray(String bytesName, String... hexBytesArray) {
+            List<byte[]> value = new ArrayList<>();
+            if (hexBytesArray != null) {
+                for (String hex : hexBytesArray) {
+                    value.add(Hex.decode(hex));
+                }
+            }
+            arguments.add(new DynamicArray(
+                    getType(bytesName),
+                    Utils.typeMap(value, getType(bytesName))));
             return this;
         }
 
         public FunctionCreator unint256Array(List<BigInteger> amounts) {
-            arguments.add(new org.web3j.abi.datatypes.DynamicArray<org.web3j.abi.datatypes.generated.Uint256>(
-                    org.web3j.abi.Utils.typeMap(amounts, org.web3j.abi.datatypes.generated.Uint256.class)));
+            arguments.add(new DynamicArray<Uint256>(
+                    Uint256.class,
+                    Utils.typeMap(amounts, Uint256.class)));
             return this;
         }
 
@@ -332,13 +499,27 @@ public class TransactionHelper {
             for (String amount : amounts) {
                 list.add(new BigInteger(amount));
             }
-            arguments.add(new org.web3j.abi.datatypes.DynamicArray<org.web3j.abi.datatypes.generated.Uint256>(
-                    org.web3j.abi.Utils.typeMap(list, org.web3j.abi.datatypes.generated.Uint256.class)));
+            arguments.add(new DynamicArray(
+                    Uint256.class,
+                    Utils.typeMap(list, Uint256.class)));
             return this;
         }
 
-        public <T> FunctionCreator arrayByType(List<BigInteger> amounts, Class<Type> type) {
-            arguments.add(new org.web3j.abi.datatypes.DynamicArray<Type>(org.web3j.abi.Utils.typeMap(amounts, type)));
+        public FunctionCreator unintArray(String unintName, List<BigInteger> amounts) {
+            arguments.add(new DynamicArray(
+                    getType(unintName),
+                    Utils.typeMap(amounts, getType(unintName))));
+            return this;
+        }
+
+        public FunctionCreator unintArray(String unintName, String... amounts) {
+            List<BigInteger> list = new ArrayList<>();
+            for (String amount : amounts) {
+                list.add(new BigInteger(amount));
+            }
+            arguments.add(new DynamicArray(
+                    getType(unintName),
+                    Utils.typeMap(list, getType(unintName))));
             return this;
         }
 
