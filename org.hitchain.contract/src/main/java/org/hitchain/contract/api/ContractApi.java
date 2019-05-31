@@ -37,10 +37,11 @@ public interface ContractApi {
      * <pre>
      * data(for ethereum):
      * PrivateKey=\n
+     * ContractByteCode=\n
      * GasLimit=5000000\n
      * Gwei=10\n
      * </pre>
-     *
+     * ContractByteCode: without 0x
      * @param data per key-value as one line: key=value.
      * @return if has error, then return result starts with "ERROR:".
      */
