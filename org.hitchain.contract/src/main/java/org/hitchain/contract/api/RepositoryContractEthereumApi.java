@@ -35,6 +35,15 @@ public interface RepositoryContractEthereumApi extends ContractApi {
     String readRepositoryAddress(String fromAddress, String contractAddress);
 
     /**
+     * Get pull request contract address.
+     *
+     * @param fromAddress     the address to read contract
+     * @param contractAddress contract address
+     * @return pull request contract address
+     */
+    String readPullRequestAddress(String fromAddress, String contractAddress);
+
+    /**
      * Get contract/repository owner address.
      *
      * @param fromAddress     the address to read contract
@@ -60,36 +69,7 @@ public interface RepositoryContractEthereumApi extends ContractApi {
      * @param memberAddress   the address to test
      * @return true if contains the address
      */
-    boolean readAuthedAccounts(String fromAddress, String contractAddress, String memberAddress);
-
-    /**
-     * Get authed account (team member)  by index.
-     *
-     * @param fromAddress     the address to read contract
-     * @param contractAddress contract address
-     * @param index           the team member address
-     * @return team member address or null
-     */
-    String readAuthedAccountList(String fromAddress, String contractAddress, int index);
-
-    /**
-     * Get authed account (team member) size.
-     *
-     * @param fromAddress     the address to read contract
-     * @param contractAddress contract address
-     * @return the team member address counts
-     */
-    int readAuthedAccountSize(String fromAddress, String contractAddress);
-
-    /**
-     * If the contract team member contains the given address.
-     *
-     * @param fromAddress     the address to read contract
-     * @param contractAddress contract address
-     * @param memberAddress   the address to test
-     * @return true if contains the address
-     */
-    boolean readHasTeamMember(String fromAddress, String contractAddress, String memberAddress);
+    boolean readTeamMember(String fromAddress, String contractAddress, String memberAddress);
 
     /**
      * Get team member address by index.
@@ -99,7 +79,16 @@ public interface RepositoryContractEthereumApi extends ContractApi {
      * @param index           the team member address
      * @return team member address or null
      */
-    String readTeamMemberAtIndex(String fromAddress, String contractAddress, int index);
+    String readTeamMemberListIndex(String fromAddress, String contractAddress, int index);
+
+    /**
+     * Get team member list count.
+     *
+     * @param fromAddress     the address to read contract
+     * @param contractAddress contract address
+     * @return
+     */
+    int readTeamMemberCount(String fromAddress, String contractAddress);
 
     /**
      * Get the repository history address.
@@ -160,6 +149,18 @@ public interface RepositoryContractEthereumApi extends ContractApi {
      * @return if has error return result starts with "ERROR:"
      */
     String writeUpdateRepositoryAddress(String oldRepositoryAddress, String newRepositoryAddress, String privateKey, String contractAddress, long gasLimit, long gWei);
+
+    /**
+     * Update repository address.
+     *
+     * @param pullRequestAddress the pull request contract address
+     * @param privateKey         operator private key
+     * @param contractAddress    contract address
+     * @param gasLimit           gas limit prefer to 500000
+     * @param gWei               gas wei prefer to 10
+     * @return if has error return result starts with "ERROR:"
+     */
+    String writeUpdatePullRequestAddress(String pullRequestAddress, String privateKey, String contractAddress, long gasLimit, long gWei);
 
     /**
      * Add repository's team member.

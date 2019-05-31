@@ -17,6 +17,7 @@ import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.Utf8String;
 
+import java.math.BigInteger;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Date;
@@ -34,9 +35,62 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class RepositoryContractEthereumService extends ContractService implements RepositoryContractEthereumApi {
 
-    public static final String CONTRACT_READ = "FromAddress={0}\nContractAddress={1}\nFunctionName={2}\nArg={3}\n";
-    public static final String CONTRACT_WRITE = "PrivateKey={0}\nContractAddress={1}\nFunctionName={2}\nArg1={3}\nArg2={4}\nArg3={5}\nGasLimit={6}\nGwei={7}\n";
-    public static final String CONTRACT_DEPLOY = "PrivateKey={0}\nGasLimit={6}\nGwei={7}\n";
+    public static final String CONTRACT_CREATE = "PrivateKey={0}\nContractByteCode={1}\nGasLimit={2}\nGwei={3}\n";
+    public static final String CONTRACT_READ = "FromAddress={0}\nContractAddress={1}\nFunctionName={2}\nFunctionType={3}\nArg0={4}\n";
+    public static final String CONTRACT_WRITE = "PrivateKey={0}\nContractAddress={1}\nFunctionName={2}\nFunctionType={3}\nArg0={4}\nArg1={5}\nArg2={6}\nGasLimit={7}\nGwei={8}\n";
+
+    public static void main(String[] args) {
+        RepositoryContractEthereumService service = new RepositoryContractEthereumService();
+        String key = InputHelper.getContent("Private Key:");
+        String from = InputHelper.getContent("Public address:");
+        String from2 = InputHelper.getContent("Team Member address:");
+        String contract = service.deployContract(key, 5000000, 10);
+        System.out.println("Contract:" + contract);
+        if (ContractApi.isError(contract)) {
+            return;
+        }
+        {
+            String writeInitWithDelegator = service.writeInitWithDelegator(from, "helloworld", from2, key, contract, 5000000, 10);
+            System.out.println("InitWithDelegator:" + writeInitWithDelegator);
+            System.out.println("Owner:" + service.readOwner(from, contract));
+            System.out.println("Delegateor:" + service.readDelegator(from, contract));
+            System.out.println("RepositoryName:" + service.readRepositoryName(from, contract));
+        }
+        {
+            String old = service.readRepositoryAddress(from, contract);
+            System.out.println("OldRepositoryAddress:" + old);
+            String writeUpdateRepositoryAddress = service.writeUpdateRepositoryAddress(StringUtils.defaultIfBlank(old, "-"), "helloworld-" + IdHelper.uuid(), key, contract, 5000000, 10);
+            System.out.println("UpdateRepositoryAddress:" + writeUpdateRepositoryAddress);
+            System.out.println("RepositoryAddress:" + service.readRepositoryAddress(from, contract));
+        }
+        {
+            String writeAddTeamMember = service.writeAddTeamMember(from2, key, contract, 5000000, 10);
+            System.out.println("AddTeamMember:" + writeAddTeamMember);
+            int count = service.readTeamMemberCount(from, contract);
+            System.out.println("readTeamMemberCount:" + count);
+            for (int i = count; i > 0; i--) {
+                String address = service.readTeamMemberListIndex(from, contract, i);
+                System.out.println("readTeamMemberListIndex-" + i + ":" + address);
+                System.out.println("readTeamMember-" + address + ":" + service.readTeamMember(from, contract, address));
+            }
+        }
+        {
+            String writeRemoveTeamMember = service.writeRemoveTeamMember(from2, key, contract, 5000000, 10);
+            System.out.println("RemoveTeamMember:" + writeRemoveTeamMember);
+            int count = service.readTeamMemberCount(from, contract);
+            System.out.println("readTeamMemberCount:" + count);
+            for (int i = count; i > 0; i--) {
+                String address = service.readTeamMemberListIndex(from, contract, i);
+                System.out.println("readTeamMemberListIndex-" + i + ":" + address);
+                System.out.println("readTeamMember-" + address + ":" + service.readTeamMember(from, contract, address));
+            }
+        }
+        {
+            String writeUpdatePullRequestAddress = service.writeUpdatePullRequestAddress(contract, key, contract, 5000000, 10);
+            System.out.println("UpdatePullRequestAddress:" + writeUpdatePullRequestAddress);
+            System.out.println("PullRequestAddress:" + service.readPullRequestAddress(from, contract));
+        }
+    }
 
     public static RepositoryContractEthereumApi getApi() {
         ContractApi.setInstance(new RepositoryContractEthereumService());
@@ -45,61 +99,117 @@ public class RepositoryContractEthereumService extends ContractService implement
 
     @Override
     public String readRepositoryName(String fromAddress, String contractAddress) {
-        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "repositoryName", "-").toString();
+        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "repositoryName", "string", "").toString();
         return readContract(data);
     }
 
     @Override
     public String readRepositoryAddress(String fromAddress, String contractAddress) {
-        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "repositoryAddress", "-").toString();
+        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "repositoryAddress", "string", "").toString();
+        return readContract(data);
+    }
+
+    @Override
+    public String readPullRequestAddress(String fromAddress, String contractAddress) {
+        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "pullRequestAddress", "address", "").toString();
         return readContract(data);
     }
 
     @Override
     public String readOwner(String fromAddress, String contractAddress) {
-        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "owner", "-").toString();
+        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "owner", "address", "").toString();
         return readContract(data);
     }
 
     @Override
     public String readDelegator(String fromAddress, String contractAddress) {
-        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "delegator", "-").toString();
+        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "delegator", "address", "").toString();
         return readContract(data);
     }
 
     @Override
-    public boolean readAuthedAccounts(String fromAddress, String contractAddress, String memberAddress) {
-        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "authedAccounts(addr)", memberAddress).toString();
-        return Boolean.TRUE.equals(readContract(data));
+    public boolean readTeamMember(String fromAddress, String contractAddress, String memberAddress) {
+        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "teamMember(address)", "bool", memberAddress).toString();
+        String result = readContract(data);
+        return "true".equals(result);
     }
 
     @Override
-    public String readAuthedAccountList(String fromAddress, String contractAddress, int index) {
-        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "authedAccountList(int)", index).toString();
+    public String readTeamMemberListIndex(String fromAddress, String contractAddress, int index) {
+        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "teamMemberList(uint256)", "address", index).toString();
         return readContract(data);
     }
 
     @Override
-    public int readAuthedAccountSize(String fromAddress, String contractAddress) {
-        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "authedAccountSize", "-").toString();
-        return NumberHelper.getInt(readContract(data), 0);
-    }
-
-    @Override
-    public boolean readHasTeamMember(String fromAddress, String contractAddress, String memberAddress) {
-        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "hasTeamMember(addr)", memberAddress).toString();
-        return Boolean.TRUE.equals(readContract(data));
-    }
-
-    @Override
-    public String readTeamMemberAtIndex(String fromAddress, String contractAddress, int index) {
-        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "teamMemberAtIndex(int)", index).toString();
-        return readContract(data);
+    public int readTeamMemberCount(String fromAddress, String contractAddress) {
+        String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "teamMemberCount", "uint256", "").toString();
+        String result = readContract(data);
+        return new BigInteger(result).intValue();
     }
 
     @Override
     public String readHistoryRepositoryAddress(String contractAddress) {
         return readHistoryRepositoryAddress0(contractAddress, new AtomicInteger(1), new AtomicInteger(1));
+    }
+
+    @Override
+    public String writeInit(String ownerAddress, String repositoryName, String privateKey, String contractAddress, long gasLimit, long gWei) {
+        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "init(address,string)", "-", ownerAddress, repositoryName, "-", gasLimit, gWei).toString();
+        return writeContract(data);
+    }
+
+    @Override
+    public String writeInitWithDelegator(String ownerAddress, String repositoryName, String delegatorAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
+        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "initWithDelegator(address,string,address)", "-", ownerAddress, repositoryName, delegatorAddress, gasLimit, gWei).toString();
+        return writeContract(data);
+    }
+
+    @Override
+    public String writeUpdateRepositoryName(String repositoryName, String privateKey, String contractAddress, long gasLimit, long gWei) {
+        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "updateRepositoryName(string)", "-", repositoryName, "-", "-", gasLimit, gWei).toString();
+        return writeContract(data);
+    }
+
+    @Override
+    public String writeUpdateRepositoryAddress(String oldRepositoryAddress, String newRepositoryAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
+        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "updateRepositoryAddress(string,string)", "-", oldRepositoryAddress, newRepositoryAddress, "-", gasLimit, gWei).toString();
+        return writeContract(data);
+    }
+
+    @Override
+    public String writeUpdatePullRequestAddress(String pullRequestAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
+        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "updatePullRequestAddress(address)", "-", pullRequestAddress, "-", "-", gasLimit, gWei).toString();
+        return writeContract(data);
+    }
+
+    @Override
+    public String writeAddTeamMember(String memberAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
+        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "addTeamMember(address)", "-", memberAddress, "-", "-", gasLimit, gWei).toString();
+        return writeContract(data);
+    }
+
+    @Override
+    public String writeRemoveTeamMember(String memberAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
+        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "removeTeamMember(address)", "-", memberAddress, "-", "-", gasLimit, gWei).toString();
+        return writeContract(data);
+    }
+
+    @Override
+    public String writeChangeOwner(String ownerAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
+        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "changeOwner(address)", "-", ownerAddress, "-", "-", gasLimit, gWei).toString();
+        return writeContract(data);
+    }
+
+    @Override
+    public String writeDelegateTo(String delegatorAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
+        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "delegateTo(address)", "-", delegatorAddress, "-", "-", gasLimit, gWei).toString();
+        return writeContract(data);
+    }
+
+    @Override
+    public String deployContract(String privateKey, long gasLimit, long gWei) {
+        String data = FCS.get(CONTRACT_CREATE, privateKey, RepositoryNameContract.repositoryNameByteCode, gasLimit, gWei).toString();
+        return deployContract(data);
     }
 
     /**
@@ -158,59 +268,5 @@ public class RepositoryContractEthereumService extends ContractService implement
             sb.append(readHistoryRepositoryAddress0(contractAddress, page, extraRequestTimes));
         }
         return sb.toString();
-    }
-
-    @Override
-    public String writeInit(String ownerAddress, String repositoryName, String privateKey, String contractAddress, long gasLimit, long gWei) {
-        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "init(addr,repoName)", ownerAddress, repositoryName, "-", gasLimit, gWei).toString();
-        return writeContract(data);
-    }
-
-    @Override
-    public String writeInitWithDelegator(String ownerAddress, String repositoryName, String delegatorAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
-        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "initWithDelegator(addr,repoName,delegator)", ownerAddress, repositoryName, delegatorAddress, gasLimit, gWei).toString();
-        return writeContract(data);
-    }
-
-    @Override
-    public String writeUpdateRepositoryName(String repositoryName, String privateKey, String contractAddress, long gasLimit, long gWei) {
-        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "updateRepositoryName(repoName)", repositoryName, "-", "-", gasLimit, gWei).toString();
-        return writeContract(data);
-    }
-
-    @Override
-    public String writeUpdateRepositoryAddress(String oldRepositoryAddress, String newRepositoryAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
-        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "updateRepositoryAddress(oldAddr,newAddr)", StringUtils.defaultString(oldRepositoryAddress, "-"), newRepositoryAddress, "-", gasLimit, gWei).toString();
-        return writeContract(data);
-    }
-
-    @Override
-    public String writeAddTeamMember(String memberAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
-        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "addTeamMember(addr)", memberAddress, "-", "-", gasLimit, gWei).toString();
-        return writeContract(data);
-    }
-
-    @Override
-    public String writeRemoveTeamMember(String memberAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
-        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "removeTeamMember(addr)", memberAddress, "-", "-", gasLimit, gWei).toString();
-        return writeContract(data);
-    }
-
-    @Override
-    public String writeChangeOwner(String ownerAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
-        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "changeOwner(addr)", ownerAddress, "-", "-", gasLimit, gWei).toString();
-        return writeContract(data);
-    }
-
-    @Override
-    public String writeDelegateTo(String delegatorAddress, String privateKey, String contractAddress, long gasLimit, long gWei) {
-        String data = FCS.get(CONTRACT_WRITE, privateKey, contractAddress, "delegateTo(addr)", delegatorAddress, "-", "-", gasLimit, gWei).toString();
-        return writeContract(data);
-    }
-
-    @Override
-    public String deployContract(String privateKey, long gasLimit, long gWei) {
-        String data = FCS.get(CONTRACT_DEPLOY, privateKey, gasLimit, gWei).toString();
-        return deployContract(data);
     }
 }
