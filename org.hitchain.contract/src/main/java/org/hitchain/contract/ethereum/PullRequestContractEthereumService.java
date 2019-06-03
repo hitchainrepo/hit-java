@@ -7,6 +7,7 @@
  ******************************************************************************/
 package org.hitchain.contract.ethereum;
 
+import org.hitchain.contract.api.ContractApi;
 import org.hitchain.contract.api.PullRequestContractEthereumApi;
 import org.iff.infra.util.FCS;
 
@@ -24,6 +25,11 @@ public class PullRequestContractEthereumService extends ContractService implemen
     public static final String CONTRACT_CREATE = "PrivateKey={0}\nContractByteCode={1}\nGasLimit={2}\nGwei={3}\n";
     public static final String CONTRACT_READ = "FromAddress={0}\nContractAddress={1}\nFunctionName={2}\nFunctionType={3}\nArg0={4}\n";
     public static final String CONTRACT_WRITE = "PrivateKey={0}\nContractAddress={1}\nFunctionName={2}\nFunctionType={3}\nArg0={4}\nGasLimit={5}\nGwei={6}\n";
+
+    public static PullRequestContractEthereumApi getApi() {
+        ContractApi.setInstance(PullRequestContractEthereumApi.class, new PullRequestContractEthereumService());
+        return (PullRequestContractEthereumApi) ContractApi.getInstance(PullRequestContractEthereumApi.class);
+    }
 
     public String readOwner(String fromAddress, String contractAddress) {
         String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "owner", "address", "").toString();
@@ -80,6 +86,18 @@ public class PullRequestContractEthereumService extends ContractService implemen
         String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "authedAccountCount", "uint256", "").toString();
         String result = readContract(data);
         return new BigInteger(result).intValue();
+    }
+
+    @Override
+    public String listCommunityPR() {
+        //TODO
+        return "Not Implement yet.";
+    }
+
+    @Override
+    public String listAuthedPR() {
+        //TODO
+        return "Not Implement yet.";
     }
 
 

@@ -69,7 +69,7 @@ public class RepositoryContractEthereumService extends ContractService implement
             int count = service.readTeamMemberCount(from, contract);
             System.out.println("readTeamMemberCount:" + count);
             for (int i = count; i > 0; i--) {
-                String address = service.readTeamMemberListIndex(from, contract, i);
+                String address = service.readTeamMemberList(from, contract, i);
                 System.out.println("readTeamMemberListIndex-" + i + ":" + address);
                 System.out.println("readTeamMember-" + address + ":" + service.readTeamMember(from, contract, address));
             }
@@ -80,7 +80,7 @@ public class RepositoryContractEthereumService extends ContractService implement
             int count = service.readTeamMemberCount(from, contract);
             System.out.println("readTeamMemberCount:" + count);
             for (int i = count; i > 0; i--) {
-                String address = service.readTeamMemberListIndex(from, contract, i);
+                String address = service.readTeamMemberList(from, contract, i);
                 System.out.println("readTeamMemberListIndex-" + i + ":" + address);
                 System.out.println("readTeamMember-" + address + ":" + service.readTeamMember(from, contract, address));
             }
@@ -93,8 +93,8 @@ public class RepositoryContractEthereumService extends ContractService implement
     }
 
     public static RepositoryContractEthereumApi getApi() {
-        ContractApi.setInstance(new RepositoryContractEthereumService());
-        return (RepositoryContractEthereumApi) ContractApi.getInstance();
+        ContractApi.setInstance(RepositoryContractEthereumApi.class, new RepositoryContractEthereumService());
+        return (RepositoryContractEthereumApi) ContractApi.getInstance(RepositoryContractEthereumApi.class);
     }
 
     @Override
@@ -135,7 +135,7 @@ public class RepositoryContractEthereumService extends ContractService implement
     }
 
     @Override
-    public String readTeamMemberListIndex(String fromAddress, String contractAddress, int index) {
+    public String readTeamMemberList(String fromAddress, String contractAddress, int index) {
         String data = FCS.get(CONTRACT_READ, fromAddress, contractAddress, "teamMemberList(uint256)", "address", index).toString();
         return readContract(data);
     }
@@ -219,7 +219,7 @@ public class RepositoryContractEthereumService extends ContractService implement
      * @return
      */
     public String readHistoryRepositoryAddress0(String contractAddress, AtomicInteger page, AtomicInteger extraRequestTimes) {
-        RequestHelper.RequestResult result = RequestHelper.get("http://api-ropsten.etherscan.io/api",
+        RequestHelper.RequestResult result = RequestHelper.get(Web3jHelper.getChainApiUrl(),
                 MapHelper.toMap(
                         "module", "account",
                         "action", "txlist",

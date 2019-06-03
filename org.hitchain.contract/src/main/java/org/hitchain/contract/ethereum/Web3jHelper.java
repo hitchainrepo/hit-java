@@ -42,4 +42,14 @@ public class Web3jHelper {
         return web3j;
     }
 
+    public static String getChainApiUrl() {
+        String url = "http://api-ropsten.etherscan.io/api";
+        try {
+            Method getChain = Class.forName("org.hitchain.hit.util.HitHelper").getDeclaredMethod("getChainApi");
+            url = (String) getChain.invoke(null);
+        } catch (Exception e) {
+        }
+        System.out.println("Connect chain api on " + url);
+        return url;
+    }
 }

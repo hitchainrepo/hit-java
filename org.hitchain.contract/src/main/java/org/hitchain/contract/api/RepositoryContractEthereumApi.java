@@ -79,7 +79,7 @@ public interface RepositoryContractEthereumApi extends ContractApi {
      * @param index           the team member address
      * @return team member address or null
      */
-    String readTeamMemberListIndex(String fromAddress, String contractAddress, int index);
+    String readTeamMemberList(String fromAddress, String contractAddress, int index);
 
     /**
      * Get team member list count.
@@ -94,7 +94,7 @@ public interface RepositoryContractEthereumApi extends ContractApi {
      * Get the repository history address.
      *
      * @param contractAddress contract address
-     * @return repository address list
+     * @return repository address list, data format=[yyyy-MM-dd'T'HH:mm:ss    fromAddress    repositoryAddress\n]*
      */
     String readHistoryRepositoryAddress(String contractAddress);
 

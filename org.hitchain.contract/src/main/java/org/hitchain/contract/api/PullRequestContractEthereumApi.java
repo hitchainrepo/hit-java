@@ -102,6 +102,18 @@ public interface PullRequestContractEthereumApi extends ContractApi {
     int readAuthedAccountCount(String fromAddress, String contractAddress);
 
     /**
+     * list community pull requests split by \n.
+     * @return
+     */
+    String listCommunityPR();
+
+    /**
+     * list authored pull requests split by \n.
+     * @return
+     */
+    String listAuthedPR();
+
+    /**
      * Change the contract's Owner.
      *
      * @param ownerAddress    new owner address

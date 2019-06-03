@@ -10,6 +10,9 @@ package org.hitchain.contract.api;
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * ContractApi
  *
@@ -19,18 +22,18 @@ import org.apache.commons.lang3.StringUtils;
  */
 public interface ContractApi {
 
-    static final ContractApi[] instance = new ContractApi[1];
+    static final Map<Class<?>, ContractApi> instance = new HashMap<>();
 
     public static boolean isError(String result) {
         return StringUtils.startsWith(result, "ERROR:");
     }
 
-    public static ContractApi getInstance() {
-        return ContractApi.instance[0];
+    public static ContractApi getInstance(Class<?> cls) {
+        return ContractApi.instance.get(cls);
     }
 
-    public static ContractApi setInstance(ContractApi contractApi) {
-        return ContractApi.instance[0] = contractApi;
+    public static ContractApi setInstance(Class<?> cls, ContractApi contractApi) {
+        return ContractApi.instance.put(cls, contractApi);
     }
 
     /**
@@ -42,6 +45,7 @@ public interface ContractApi {
      * Gwei=10\n
      * </pre>
      * ContractByteCode: without 0x
+     *
      * @param data per key-value as one line: key=value.
      * @return if has error, then return result starts with "ERROR:".
      */

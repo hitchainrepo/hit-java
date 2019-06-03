@@ -198,6 +198,13 @@ public class TransactionHelper {
         return results != null ? results.size() : 0;
     }
 
+    /**
+     * decode transaction input raw data
+     *
+     * @param transactions this transaction decode from the input raw data
+     * @param function     the function to filter
+     * @return List&lt;Tuple.Four&gt; first: methodName, second: input parameter data, third: from address, fourth: timestamp.
+     */
     public static List<Tuple.Four<Object/*result*/, String/*methodName*/, List<Type>/*inputParameter*/, String/*from*/, Date/*timestamp*/>> decodeInput(Map transactions, Function function) {
         List<Tuple.Four<Object, String, List<Type>, String, Date>> list = new ArrayList<>();
         if (transactions == null || transactions.isEmpty()) {
