@@ -10,8 +10,11 @@ package org.hitchain.core;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.Repository;
+import org.hitchain.contract.api.ContractApi;
+import org.hitchain.contract.api.PullRequestContractEthereumApi;
 import org.hitchain.contract.api.RepositoryContractEthereumApi;
 import org.hitchain.contract.api.TokenEthereumApi;
+import org.hitchain.contract.ethereum.PullRequestContractEthereumService;
 import org.hitchain.contract.ethereum.RepositoryContractEthereumService;
 import org.hitchain.contract.ethereum.TokenEthereumService;
 import org.hitchain.hit.api.ProjectInfoFile;
@@ -71,8 +74,9 @@ public class Main {
             "hit cfg storage    add name url\n" +
             "hit cfg repository add name url\n" +
             "hit cfg chain      add name url(https://ropsten.infura.io, https://mainnet.infura.io/0x7995ab36bB307Afa6A683C24a25d90Dc1Ea83566)\n" +
-            "hit cfg [account|rsa|storage|repository|chain] remove name\n" +
-            "hit cfg [account|rsa|storage|repository|chain] set    name";
+            "hit cfg chainapi   add name url(http://api-ropsten.etherscan.io/api, https://api.etherscan.io/api)\n" +
+            "hit cfg [account|rsa|storage|repository|chain|chainapi] remove name\n" +
+            "hit cfg [account|rsa|storage|repository|chain|chainapi] set    name";
     public static final String HELP_REPO = "" +
             "hit repo help\n" +
             "hit repo keypair   add\n" +
@@ -84,19 +88,19 @@ public class Main {
             "hit contract help\n" +
             "hit contract repositoryName\n" +
             "hit contract repositoryAddress\n" +
+            "hit contract pullRequestAddress\n" +
             "hit contract owner\n" +
             "hit contract delegator\n" +
-            "hit contract authedAccounts           memberAddress\n" +
-            "hit contract authedAccountList        index\n" +
-            "hit contract authedAccountSize\n" +
-            "hit contract hasTeamMember            memberAddress\n" +
-            "hit contract teamMemberAtIndex        index\n" +
+            "hit contract teamMember\n" +
+            "hit contract teamMemberList\n" +
+            "hit contract teamMemberCount\n" +
             "hit contract historyRepositoryAddress \n" +
             "hit contract deploy                   gasLimit(5000000)  gWei\n" +
             "hit contract init                     gasLimit( 500000)  gWei  ownerAddress repositoryName\n" +
             "hit contract initWithDelegator        gasLimit( 500000)  gWei  ownerAddress repositoryName delegatorAddress\n" +
             "hit contract updateRepositoryName     gasLimit( 500000)  gWei  newRepositoryName \n" +
             "hit contract updateRepositoryAddress  gasLimit( 500000)  gWei  newRepositoryAddress\n" +
+            "hit contract updatePullRequestAddress gasLimit( 500000)  gWei  pullRequestContractAddress\n" +
             "hit contract addTeamMember            gasLimit( 500000)  gWei  memberAddress\n" +
             "hit contract removeTeamMember         gasLimit( 500000)  gWei  memberAddress\n" +
             "hit contract changeOwner              gasLimit( 500000)  gWei  memberAddress\n" +
@@ -107,6 +111,25 @@ public class Main {
             "hit token readHitToken     [accountAddress]\n" +
             "hit token readContactToken contractAddress functionName [accountAddress]\n" +
             "hit token requestTestToken [accountAddress]";
+    public static final String HELP_PULLREQUEST = "" +
+            "hit pullRequest help\n" +
+            "hit pullRequest owner\n" +
+            "hit pullRequest delegator\n" +
+            "hit pullRequest communityPullRequest  index\n" +
+            "hit pullRequest communityPullRequestCount\n" +
+            "hit pullRequest authedPullRequest  index\n" +
+            "hit pullRequest authedPullRequestCount\n" +
+            "hit pullRequest authedAccount accountAddress\n" +
+            "hit pullRequest authedAccountList  index\n" +
+            "hit pullRequest authedAccountCount\n" +
+            "hit pullRequest listCommunityPR\n" +
+            "hit pullRequest listAuthedPR" +
+            "hit pullRequest enable               gasLimit(5000000)  gWei  [gasLimit(500000)]  [gWei]\n" +
+            "hit pullRequest changeOwner          gasLimit(5000000)  gWei  ownerAddress\n" +
+            "hit pullRequest delegateTo           gasLimit(5000000)  gWei  delegatorAddress\n" +
+            "hit pullRequest addPullRequest       gasLimit(5000000)  gWei  pullRequest\n" +
+            "hit pullRequest addAuthedAccount     gasLimit(5000000)  gWei  accountAddress\n" +
+            "hit pullRequest removeAuthedAccount  gasLimit(5000000)  gWei  accountAddress\n";
 
     public static void main(String[] args) throws Exception {
         //System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/hello");
@@ -136,6 +159,7 @@ public class Main {
             System.out.println(HELP_REPO);
             System.out.println(HELP_CONTRACT);
             System.out.println(HELP_TOKEN);
+            System.out.println(HELP_PULLREQUEST);
         }
         //
         if (args != null && args.length > 0 && "cfg".equals(args[0])) {
@@ -284,10 +308,34 @@ public class Main {
                 HitHelper.chainInfo(name);
                 return;
             }
+            if (HitHelper.TYPE_chainapi.equals(type)) {
+                if (HitHelper.ACTION_add.equals(operation)) {
+                    if (HitHelper.chainAdd(name, v1)) {
+                        HitHelper.hitConfigToFile(HitHelper.getHitConfig());
+                    }
+                    return;
+                }
+                if (HitHelper.ACTION_remove.equals(operation)) {
+                    if (HitHelper.chainRemove(name)) {
+                        HitHelper.hitConfigToFile(HitHelper.getHitConfig());
+                    }
+                    return;
+                }
+                if (HitHelper.ACTION_set.equals(operation)) {
+                    if (HitHelper.chainSet(name)) {
+                        HitHelper.hitConfigToFile(HitHelper.getHitConfig());
+                    }
+                    return;
+                }
+                HitHelper.chainInfo(name);
+                return;
+            }
 
             System.out.println(HELP_CFG);
             return;
-        } else if (args != null && args.length > 0 && "repo".equals(args[0])) {
+        }
+        /*-----------------------------------------------------repo-----------------------------------------------------*/
+        else if (args != null && args.length > 0 && "repo".equals(args[0])) {
             File projectDir = null;
             {
                 String workDir = System.getProperty("git_work_tree");
@@ -363,7 +411,9 @@ public class Main {
 
             System.out.println(HELP_REPO);
             return;
-        } else if (args != null && args.length > 0 && "contract".equals(args[0])) {
+        }
+        /*-----------------------------------------------------contract-----------------------------------------------------*/
+        else if (args != null && args.length > 0 && "contract".equals(args[0])) {
             File projectDir = null;
             {
                 String workDir = System.getProperty("git_work_tree");
@@ -408,6 +458,11 @@ public class Main {
                 System.out.println(result);
                 return;
             }
+            if ("pullRequestAddress".equals(operation)) {
+                String result = api.readPullRequestAddress(fromAddress, contractAddress);
+                System.out.println(result);
+                return;
+            }
             if ("owner".equals(operation)) {
                 String result = api.readOwner(fromAddress, contractAddress);
                 System.out.println(result);
@@ -418,28 +473,18 @@ public class Main {
                 System.out.println(result);
                 return;
             }
-            if ("authedAccounts".equals(operation)) {
-                boolean result = api.readAuthedAccounts(fromAddress, contractAddress, arg0 = gasLimitStr);
+            if ("teamMember".equals(operation)) {
+                boolean result = api.readTeamMember(fromAddress, contractAddress, arg0 = gasLimitStr);
                 System.out.println(result);
                 return;
             }
-            if ("authedAccountList".equals(operation)) {
-                String result = api.readAuthedAccountList(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
+            if ("teamMemberList".equals(operation)) {
+                String result = api.readTeamMemberList(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
                 System.out.println(result);
                 return;
             }
-            if ("authedAccountSize".equals(operation)) {
-                int result = api.readAuthedAccountSize(fromAddress, contractAddress);
-                System.out.println(result);
-                return;
-            }
-            if ("hasTeamMember".equals(operation)) {
-                boolean result = api.readHasTeamMember(fromAddress, contractAddress, arg0 = gasLimitStr);
-                System.out.println(result);
-                return;
-            }
-            if ("teamMemberAtIndex".equals(operation)) {
-                String result = api.readTeamMemberAtIndex(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
+            if ("teamMemberCount".equals(operation)) {
+                int result = api.readTeamMemberCount(fromAddress, contractAddress);
                 System.out.println(result);
                 return;
             }
@@ -499,7 +544,9 @@ public class Main {
 
             System.out.println(HELP_CONTRACT);
             return;
-        } else if (args != null && args.length > 0 && "token".equals(args[0])) {
+        }
+        /*-----------------------------------------------------token-----------------------------------------------------*/
+        else if (args != null && args.length > 0 && "token".equals(args[0])) {
             File projectDir = null;
             {
                 String workDir = System.getProperty("git_work_tree");
@@ -551,6 +598,143 @@ public class Main {
                 return;
             }
             System.out.println(HELP_TOKEN);
+            return;
+        }
+        /*-----------------------------------------------------pullRequest-----------------------------------------------------*/
+        else if (args != null && args.length > 0 && "pullRequest".equals(args[0])) {
+            File projectDir = null;
+            {
+                String workDir = System.getProperty("git_work_tree");
+                if (workDir == null) {
+                    workDir = ".";
+                }
+                projectDir = new File(workDir + "/.git");
+            }
+            if (projectDir == null || !projectDir.exists()) {
+                System.err.println(projectDir.getAbsolutePath() + " is invalid git dir.");
+                System.exit(1);
+            }
+            LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
+            list.poll();
+            if (list.isEmpty()) {
+                list.add(HitHelper.TYPE_help);
+            }
+            // read  : Operation=
+            // write : Operation=
+            // enable: Operation=deploy
+            String operation = list.poll();// Operation, enable, help
+            String gasLimitStr = list.poll();// as arg0 for read
+            String gweiStr = list.poll();//
+            String arg0 = list.poll(); // gasLimitStr for pull request enable for update the repository contract
+            String arg1 = list.poll(); // gweiStr for pull request enable for update the repository contract
+            if (HitHelper.TYPE_help.equals(operation)) {
+                System.out.println(HELP_PULLREQUEST);
+                return;
+            }
+            ProjectInfoFile projectInfoFile = HitHelper.getProjectInfoFile(projectDir);
+            PullRequestContractEthereumApi api = PullRequestContractEthereumService.getApi();
+            String fromAddress = HitHelper.getAccountAddress();
+            String contractAddress = projectInfoFile.getRepoAddress();
+            if ("owner".equals(operation)) {
+                String result = api.readOwner(fromAddress, contractAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("delegator".equals(operation)) {
+                String result = api.readDelegator(fromAddress, contractAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("communityPullRequest".equals(operation)) {
+                String result = api.readCommunityPullRequest(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
+                System.out.println(result);
+                return;
+            }
+            if ("communityPullRequestCount".equals(operation)) {
+                int result = api.readCommunityPullRequestCount(fromAddress, contractAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("authedPullRequest".equals(operation)) {
+                String result = api.readCommunityPullRequest(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
+                System.out.println(result);
+                return;
+            }
+            if ("authedPullRequestCount".equals(operation)) {
+                int result = api.readCommunityPullRequestCount(fromAddress, contractAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("authedAccount".equals(operation)) {
+                boolean result = api.readAuthedAccount(fromAddress, contractAddress, arg0 = gasLimitStr);
+                System.out.println(result);
+                return;
+            }
+            if ("authedAccountList".equals(operation)) {
+                String result = api.readAuthedAccountList(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
+                System.out.println(result);
+                return;
+            }
+            if ("authedAccountCount".equals(operation)) {
+                int result = api.readAuthedAccountCount(fromAddress, contractAddress);
+                System.out.println(result);
+                return;
+            }
+            if ("listCommunityPR".equals(operation)) {
+                String result = api.listCommunityPR();
+                System.out.println(result);
+                return;
+            }
+            if ("listAuthedPR".equals(operation)) {
+                String result = api.listAuthedPR();
+                System.out.println(result);
+                return;
+            }
+            //
+            long gasLimit = NumberHelper.getLong(gasLimitStr, 0);
+            long gWei = NumberHelper.getLong(gweiStr, 0);
+            if ("enable".equals(operation)) {
+                String result = api.deployContract(HitHelper.getAccountPriKeyWithPasswordInput(), gasLimit, gWei);
+                if (ContractApi.isError(result)) {
+                    System.out.println("Deploy pull request contract failed, error: " + result + "!");
+                    return;
+                }
+                System.out.println("Pull request contract deploy success, contract address: " + result);
+                String result2 = RepositoryContractEthereumService.getApi().writeUpdatePullRequestAddress(result, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, NumberHelper.getLong(arg0, 500000), NumberHelper.getLong(arg1, 10));
+                if (ContractApi.isError(result2)) {
+                    System.out.println("Update pull request contract failed, error: " + result2 + "!");
+                } else {
+                    System.out.println("Pull request enable success.");
+                }
+                return;
+            }
+            if ("changeOwner".equals(operation)) {
+                String result = api.writeChangeOwner(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("delegateTo".equals(operation)) {
+                String result = api.writeDelegateTo(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("addPullRequest".equals(operation)) {
+                String result = api.writeAddPullRequest(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("addAuthedAccount".equals(operation)) {
+                String result = api.writeAddAuthedAccount(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+            if ("removeAuthedAccount".equals(operation)) {
+                String result = api.writeRemoveAuthedAccount(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
+
+            System.out.println(HELP_CONTRACT);
             return;
         } else {
             Class<?> main = Class.forName("org.eclipse.jgit.pgm.Main");

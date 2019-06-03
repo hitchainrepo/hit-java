@@ -60,6 +60,7 @@ public class HitHelper {
     public static final String TYPE_create = "create";
     public static final String TYPE_recover = "recover";
     public static final String TYPE_chain = "chain";
+    public static final String TYPE_chainapi = "chainapi";
     //
     public static final String TYPE_member = "member";
     public static final String TYPE_keypair = "keypair";
@@ -170,7 +171,7 @@ public class HitHelper {
             two.result(kv.get(NAME_default));
             return two;
         }
-        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_main
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main
             if (!kv.containsKey(name)) {
                 return null;
             }
@@ -210,7 +211,7 @@ public class HitHelper {
             kv.put(pri, value2);
             return true;
         }
-        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_main
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main
             if (NAME_default.equals(name)) {
                 kv.put(name, value1);
                 return true;
@@ -247,7 +248,7 @@ public class HitHelper {
             }
             return true;
         }
-        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_main
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main
             kv.remove(name);
             if (name.equals(StringUtils.trim(kv.get(NAME_default)))) {
                 kv.put(NAME_default, "");
@@ -313,6 +314,13 @@ public class HitHelper {
             if (kv == null) {
                 chainAdd("test", "https://ropsten.infura.io");
                 chainAdd("main", "https://mainnet.infura.io/0x7995ab36bB307Afa6A683C24a25d90Dc1Ea83566");
+            }
+        }
+        {//init chain api
+            Map<String, String> kv = getHitConfig().get(TYPE_chainapi);
+            if (kv == null) {
+                chainAdd("test", "http://api-ropsten.etherscan.io/api");
+                chainAdd("main", "https://api.etherscan.io/api");
             }
         }
         return true;
@@ -596,6 +604,50 @@ public class HitHelper {
         return true;
     }
 
+    public static void chainApiInfo(String name) {
+        if (name == null) {
+            hitConfigInfo(TYPE_chainapi);
+            return;
+        }
+        Tuple.Two<String, String, String> two = getByName(getHitConfig(), TYPE_chainapi, name);
+        if (two == null) {
+            System.out.println("Can not find the chain api name: " + name);
+            return;
+        }
+        System.out.println("The information by chain api's name: " + name);
+        System.out.println("chain api url :" + two.first());
+        System.out.println("default   name:" + two.result());
+    }
+
+    public static boolean chainApiAdd(String name, String url) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        if (!isValidUrl(url)) {
+            return false;
+        }
+        addByName(getHitConfig(), TYPE_chainapi, name, url, null);
+        return true;
+    }
+
+    public static boolean chainApiRemove(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        return removeByName(getHitConfig(), TYPE_chainapi, name);
+    }
+
+    public static boolean chainApiSet(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        if (getByName(getHitConfig(), TYPE_chainapi, name) == null || !addByName(getHitConfig(), TYPE_chainapi, NAME_default, name, null)) {
+            System.out.println("Can not find the chain api " + name + " config!");
+            return false;
+        }
+        return true;
+    }
+
     public static Map<String, Map<String, String>> getHitConfig() {
         return hitConfig == null ? hitConfig() : hitConfig;
     }
@@ -680,6 +732,11 @@ public class HitHelper {
 
     public static String getChain() {
         Tuple.Two<String, String, String> two = getDefaultValue(TYPE_chain);
+        return two == null ? null : two.first();
+    }
+
+    public static String getChainApi() {
+        Tuple.Two<String, String, String> two = getDefaultValue(TYPE_chainapi);
         return two == null ? null : two.first();
     }
 
