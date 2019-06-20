@@ -80,10 +80,16 @@ public class HitIPFSStorage {
                     }
                 }
             }
+        } else {
+            projectInfoFile = GitHelper.readProjectInfoFile(projectDir);
         }
+
         if (projectInfoFile == null) {
             GitHelper.onInitHitRepository(projectDir);
             projectInfoFile = GitHelper.readProjectInfoFile(projectDir);
+        }
+
+        {
             String projectAddress = EthereumHelper.getProjectAddress(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress());
             String gitFileIndexHash = projectAddress;
             ipfs = GitHelper.getIpfs(projectInfoFile.getFileServerUrl());

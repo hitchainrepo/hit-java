@@ -1,17 +1,21 @@
 package org.hitchain.hit.util;
 
+import com.google.gson.GsonBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bouncycastle.util.encoders.Hex;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.internal.storage.file.FileRepository;
+import org.eclipse.jgit.lib.Repository;
 import org.hitchain.hit.api.ProjectInfoFile;
+import org.iff.infra.util.MapHelper;
 
 import java.io.BufferedReader;
 import java.io.Console;
 import java.io.File;
 import java.io.InputStreamReader;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
@@ -1017,5 +1021,50 @@ public class HitHelper {
                 .append("Public  Key:").append(projectInfoFile.getRepoPubKey()).append("\n")
                 .append("Private Key:").append(projectInfoFile.getRepoPriKey()).append("\n");
         System.out.println(sb);
+    }
+
+    public static String createPullRequest(File gitDir, String startBranch, String endBranch) {
+        String pullRequestHash = null;
+        {// upload pull request patch
+            startBranch = StringUtils.isBlank(startBranch) ? GitHelper.findDefaultRemoteBranch(gitDir) : startBranch;
+            endBranch = StringUtils.isBlank(endBranch) ? GitHelper.findDefaultBranch(gitDir) : endBranch;
+            System.out.println("Create pull request from start branch " + startBranch + " to end banch " + endBranch + ".");
+            byte[] bs = GitHelper.createPatch(gitDir, startBranch, endBranch);
+            if (bs == null || bs.length < 1) {
+                System.err.println("Nothing changed of pull request from start branch " + startBranch + " to end banch " + endBranch + ".");
+                return null;
+            }
+            System.out.println(new String(bs));
+            pullRequestHash = GitHelper.writeFileToIpfs(bs, "pullRequest.patch");
+            System.out.println("PullRequest: http://" + HitHelper.getStorage() + ":8080/ipfs/" + pullRequestHash);
+        }
+        {// push repository
+            try (Repository repo = new FileRepository(gitDir)) {
+                new Git(repo).push().call();
+            } catch (Exception e) {
+                throw new RuntimeException("HitHelper can not push the repository!", e);
+            }
+        }
+        return pullRequestHash;
+    }
+
+    public static String createPullRequestInfo(String author, String comment, String[] pullRequests) {
+        Map info = MapHelper.toMap(
+                "url", "",
+                "author", author,
+                "author_address", "",
+                "author_pub_key", "",
+                "comment", comment,
+                "date", new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US).format(new Date()),
+                "pull_request", pullRequests
+        );
+        String prInfo = new GsonBuilder().setPrettyPrinting().create().toJson(info);
+        String prInfoHash = null;
+        {// upload pull request info
+            System.out.println(prInfo);
+            prInfoHash = GitHelper.writeFileToIpfs(ByteHelper.utf8(prInfo), "pullRequestInfo.json");
+            System.out.println("PullRequestInfo: http://" + HitHelper.getStorage() + ":8080/ipfs/" + prInfoHash);
+        }
+        return prInfoHash;
     }
 }

@@ -17,15 +17,27 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bouncycastle.util.encoders.Hex;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.ListBranchCommand;
+import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.internal.storage.file.LockFile;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.hitchain.hit.api.EncryptableFileWrapper;
 import org.hitchain.hit.api.HashedFile;
 import org.hitchain.hit.api.ProjectInfoFile;
 import org.hitchain.hit.util.Tuple.Two;
 
 import java.io.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -38,12 +50,6 @@ import java.util.zip.GZIPOutputStream;
  */
 public class GitHelper {
 
-    //public static final String URL_IPFS = System.getProperty("URL_IPFS", "121.40.127.45"/*"http://121.40.127.45"*/);
-    //public static final String URL_ETHER = System.getProperty("URL_ETHER", "https://121.40.127.45:1443");
-    //public static final String rootPubKeyEcc = "0x837a4bbef0f7235b8fdb03c55d0d98f27f49cda8";
-    //public static final String rootPriKeyEcc = "448b60044aec0065a08115d7af1038491830f697c36118e046e38cf7002ee45b";
-    //public static final String rootPubKeyRsa = "30819f300d06092a864886f70d010101050003818d0030818902818100df6c814a1b827317370607e207a8749f12497d4ea339cd4f4a38df3690c9d24eb279852780105ed4f7a493833b0ed27409b74eb58b1a452a66be052146ee1f5fb0fa42231221f22cd73e70026b606862b91365fdbe6b2af79838eaa38db60dddc01ecf78f6881880ad399e65747fe86f5e844f5cd4b40f6de8c3e8e60db343290203010001";
-    //public static final String rootPriKeyRsa = "30820275020100300d06092a864886f70d01010105000482025f3082025b02010002818100df6c814a1b827317370607e207a8749f12497d4ea339cd4f4a38df3690c9d24eb279852780105ed4f7a493833b0ed27409b74eb58b1a452a66be052146ee1f5fb0fa42231221f22cd73e70026b606862b91365fdbe6b2af79838eaa38db60dddc01ecf78f6881880ad399e65747fe86f5e844f5cd4b40f6de8c3e8e60db343290203010001028180549653eca6b5a0b52d53cf30380e02f926874435bd7e68c8982527fd149c144f4f2acacac5a56d01dc3026d90c46f44e924f2031835492d316cae24e52f85c4fbd1a340b7b4f60f758631f16955d8503a154858f129a0d66268b9a929caaa1e1ff944c861a13c28e2d0869a93f8ffc508450339856de7869b8dbcce66dbde7b1024100f63fb36a8067288e16e2d63b4dda45bf7e8ebf00e34ac4514d169cfe50aba01a1d4785fe38226893814bda6c49a7888aa4a9a108045ac2db9c65ffecdefb5eeb024100e8456b9fb09c93280b3cf1364b00b997bb3293b7f95dba8cd48bd1ef734c64cd51cdb6140948a058f9588b9f4495ce88ba5790e663e711f730f296c7f602693b02407c498e8ef49c1c960aeb16e1fbdb6d54c7d5d885e432ba7fa67f016242e93cf7b14b864fd799565b0ce9722731cdc356e6e14f0bb2d6f47ecfa393d6c47cef5d02401a5b8e5bffc1b4dd4d712bfa3a46a9c8f320492d0e6a397a33c06e215b172735397c3b96487b6a5ece64e2eb3ef03510c4fc9cdfd82467a0827874edda17e9f3024002afe2f48990647b96526c6f2ddfee427a21fafd02ad982981425372587c14f742f1c1133a0f34084436cf78b0a55484fbb547f20077b937da7e5569f63a5ad9";
     public static final String HIT_GITFILE_IDX = "objects/hit/gitfile.idx";
     public static final String HIT_GITFILE_IDX_NAME = "gitfile.idx";
     public static final String HIT_PROJECT_INFO = "objects/hit/projectinfo";
@@ -201,6 +207,16 @@ public class GitHelper {
         updateProjectAddress(projectInfoFile, gitFileIndexHash);
     }
 
+    public static void updatePullRequestGitFileIndex(File projectDir, ProjectInfoFile projectInfoFile, Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> old, Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> upload) {
+        //#6.Gen the new GitFileIndex.
+        Map<String, Two<Object, String/* ipfs hash */, String/* sha1 */>> combine = new LinkedHashMap<>();
+        combine.putAll(old);
+        combine.putAll(upload);
+        //#7.Write the new GitFileIndex to disk and ipfs.
+        String gitFileIndexHash = writeGitFileIndexToIpfs(projectDir, combine);
+        System.out.println("Repository information local directory=" + projectDir.getPath() + ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
+    }
+
     /**
      * <pre>
      * #1.Get or create ProjectInfoFile.
@@ -307,6 +323,17 @@ public class GitHelper {
             map.put(key, new Two(ipfsHash, sha1));
         }
         return map;
+    }
+
+    public static String writeFileToIpfs(byte[] data, String fileName) {
+        IPFS ipfs = getIpfs();
+        try {
+            NamedStreamable.ByteArrayWrapper file = new NamedStreamable.ByteArrayWrapper(fileName, data);
+            List<MerkleNode> add = ipfs.add(file);
+            return add.get(add.size() - 1).hash.toBase58();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static IPFS getIpfs() {
@@ -552,5 +579,138 @@ public class GitHelper {
             return dir.getParentFile().getName();
         }
         throw new RuntimeException("GitHelper can not get project owner !");
+    }
+
+    /**
+     * find default local branch, is exists only one branch the return the branch name, else return null.
+     *
+     * @param gitDir
+     * @return
+     */
+    public static String findDefaultBranch(File gitDir) {
+        try (Repository repo = new FileRepository(gitDir)) {
+            return repo.exactRef(Constants.HEAD).getTarget().getName();
+        } catch (Exception e) {
+            throw new RuntimeException("GitHelper can not find local branch!", e);
+        }
+    }
+
+    /**
+     * find default remote branch, is exists only one branch the return the branch name, else return null.
+     *
+     * @param gitDir
+     * @return
+     */
+    public static String findDefaultRemoteBranch(File gitDir) {
+        try (Repository repo = new FileRepository(gitDir)) {
+            Git git = new Git(repo);
+            List<Ref> branches = git.branchList().setListMode(ListBranchCommand.ListMode.REMOTE).call();
+            if (branches.size() != 1) {
+                return null;
+            }
+            return branches.get(0).getName();
+        } catch (Exception e) {
+            throw new RuntimeException("GitHelper can not find retmote branch!", e);
+        }
+    }
+
+    /**
+     * create patch by default branch if branch is not set.
+     *
+     * @param gitDir
+     * @param startRev
+     * @param endRev
+     * @return
+     */
+    public static byte[] createPatchByDefaultBranch(File gitDir, String startRev, String endRev) {
+        if (StringUtils.isBlank(startRev)) {
+            startRev = findDefaultRemoteBranch(gitDir);
+        }
+        if (StringUtils.isBlank(endRev)) {
+            endRev = findDefaultBranch(gitDir);
+        }
+        if (StringUtils.isBlank(startRev)) {
+            throw new IllegalArgumentException("GitHelper start branch name need to specify!");
+        }
+        if (StringUtils.isBlank(endRev)) {
+            throw new IllegalArgumentException("GitHelper end branch name need to specify!");
+        }
+        return createPatch(gitDir, startRev, endRev);
+    }
+
+    /**
+     * create patch from start branch name (not include) to end branchName.
+     *
+     * @param gitDir   git dir
+     * @param startRev the start revision (no include)
+     * @param endRev   the end revision.
+     * @return
+     */
+    public static byte[] createPatch(File gitDir, String startRev, String endRev) {
+        try (Repository repo = new FileRepository(gitDir)) {
+            Git git = new Git(repo);
+            RevWalk walk = new RevWalk(repo);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            DiffFormatter df = new DiffFormatter(baos);
+            df.setRepository(repo);
+            Iterable<RevCommit> result = new Git(repo).log()
+                    .not(repo.resolve(startRev))
+                    .add(repo.resolve(endRev))
+                    .call();
+            List<RevCommit> commits = new ArrayList<>();
+            for (RevCommit rev : result) {
+                commits.add(rev);
+            }
+            Collections.reverse(commits);
+            RevCommit base = walk.parseCommit(repo.resolve(startRev).toObjectId());
+            AtomicInteger count = new AtomicInteger(0);
+            int total = commits.size();
+            for (RevCommit rev : commits) {
+                baos.write(formatEmailHeader(rev, count.incrementAndGet(), total).getBytes("UTF-8"));
+                df.format(base.getTree(), rev.getTree());
+                base = rev;
+            }
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("GitHelper can not create patch!", e);
+        }
+    }
+
+    private static String formatEmailHeader(RevCommit commit, int count, int total) {
+        StringBuilder b = new StringBuilder();
+        PersonIdent author = commit.getAuthorIdent();
+        String subject = commit.getShortMessage();
+        String msg = commit.getFullMessage().substring(subject.length());
+        if (msg.startsWith("\n\n")) {
+            msg = msg.substring(2);
+        }
+        b.append("From ")
+                .append(commit.getName())
+                .append(' ')
+                .append(
+                        "Mon Sep 17 00:00:00 2001\n") // Fixed timestamp to match output of C Git's format-patch
+                .append("From: ")
+                .append(author.getName())
+                .append(" <")
+                .append(author.getEmailAddress())
+                .append(">\n")
+                .append("Date: ")
+                .append(formatDate(author))
+                .append('\n')
+                .append("Subject: [PATCH " + count + "/" + total + "] ")
+                .append(subject)
+                .append('\n')
+                .append('\n')
+                .append(msg);
+        if (!msg.endsWith("\n")) {
+            b.append('\n');
+        }
+        return b.append("---\n\n").toString();
+    }
+
+    private static String formatDate(PersonIdent author) {
+        SimpleDateFormat df = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US);
+        df.setCalendar(Calendar.getInstance(author.getTimeZone(), Locale.US));
+        return df.format(author.getWhen());
     }
 }

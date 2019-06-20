@@ -22,8 +22,10 @@ import org.hitchain.hit.util.HitHelper;
 import org.hitchain.hit.util.WalletHelper;
 import org.iff.infra.util.MapHelper;
 import org.iff.infra.util.NumberHelper;
+import org.web3j.utils.Numeric;
 
 import java.io.File;
+import java.math.BigInteger;
 import java.util.*;
 
 /**
@@ -113,6 +115,7 @@ public class Main {
             "hit token requestTestToken [accountAddress]";
     public static final String HELP_PULLREQUEST = "" +
             "hit pullRequest help\n" +
+            "hit pullRequest create gasLimit(500000) gWei -m 'comment' [startBranch] [endBranch]\n" +
             "hit pullRequest owner\n" +
             "hit pullRequest delegator\n" +
             "hit pullRequest communityPullRequest  index\n" +
@@ -124,7 +127,7 @@ public class Main {
             "hit pullRequest authedAccountCount\n" +
             "hit pullRequest listCommunityPR\n" +
             "hit pullRequest listAuthedPR" +
-            "hit pullRequest enable               gasLimit(5000000)  gWei  [gasLimit(500000)]  [gWei]\n" +
+            "hit pullRequest enable               gasLimit(5000000)  gWei  [gasLimit(500000)]  [gWei] [-f]\n" +
             "hit pullRequest changeOwner          gasLimit(5000000)  gWei  ownerAddress\n" +
             "hit pullRequest delegateTo           gasLimit(5000000)  gWei  delegatorAddress\n" +
             "hit pullRequest addPullRequest       gasLimit(5000000)  gWei  pullRequest\n" +
@@ -132,8 +135,9 @@ public class Main {
             "hit pullRequest removeAuthedAccount  gasLimit(5000000)  gWei  accountAddress\n";
 
     public static void main(String[] args) throws Exception {
-        //System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/hello");
-        //args = new String[]{"contract","historyRepositoryAddress"};
+        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/hellopr");
+        args = new String[]{"pullRequest", "create", "5000000", "10", "-m", "test pull request"};
+        System.out.println("ARG:" + Arrays.toString(args));
         //
         //this just pre-input password.
         {
@@ -141,9 +145,9 @@ public class Main {
                     "cfg", new HashSet<>(Arrays.asList("account", "rsa")),
                     "repo", new HashSet<>(Arrays.asList("keypair", "member")),
                     "contract", new HashSet<>(Arrays.asList("deploy", "init", "initWithDelegator", "updateRepositoryName", "updateRepositoryAddress", "addTeamMember", "removeTeamMember", "changeOwner", "delegateTo")),
+                    "pullRequest", new HashSet<>(),
                     "push", new HashSet<>(),
-                    "fetch", new HashSet<>(),
-                    "clone", new HashSet<>()
+                    "fetch", new HashSet<>()
             );
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             if (!HitHelper.getHitConfig().isEmpty() && args.length > 0) {
@@ -601,7 +605,7 @@ public class Main {
             return;
         }
         /*-----------------------------------------------------pullRequest-----------------------------------------------------*/
-        else if (args != null && args.length > 0 && "pullRequest".equals(args[0])) {
+        else if (args != null && args.length > 0 && ("pullRequest".equals(args[0]) || "pr".equals(args[0]))) {
             File projectDir = null;
             {
                 String workDir = System.getProperty("git_work_tree");
@@ -619,22 +623,20 @@ public class Main {
             if (list.isEmpty()) {
                 list.add(HitHelper.TYPE_help);
             }
-            // read  : Operation=
-            // write : Operation=
-            // enable: Operation=deploy
             String operation = list.poll();// Operation, enable, help
-            String gasLimitStr = list.poll();// as arg0 for read
-            String gweiStr = list.poll();//
-            String arg0 = list.poll(); // gasLimitStr for pull request enable for update the repository contract
-            String arg1 = list.poll(); // gweiStr for pull request enable for update the repository contract
+            String p1 = list.poll(), p2 = list.poll(), p3 = list.poll(), p4 = list.poll(), p5 = list.poll(), p6 = list.poll();
+            String gasLimitStr = p1, gweiStr = p2;
             if (HitHelper.TYPE_help.equals(operation)) {
                 System.out.println(HELP_PULLREQUEST);
                 return;
             }
+            //
             ProjectInfoFile projectInfoFile = HitHelper.getProjectInfoFile(projectDir);
             PullRequestContractEthereumApi api = PullRequestContractEthereumService.getApi();
+            RepositoryContractEthereumApi repoApi = RepositoryContractEthereumService.getApi();
             String fromAddress = HitHelper.getAccountAddress();
             String contractAddress = projectInfoFile.getRepoAddress();
+            ///
             if ("owner".equals(operation)) {
                 String result = api.readOwner(fromAddress, contractAddress);
                 System.out.println(result);
@@ -646,7 +648,7 @@ public class Main {
                 return;
             }
             if ("communityPullRequest".equals(operation)) {
-                String result = api.readCommunityPullRequest(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
+                String result = api.readCommunityPullRequest(fromAddress, contractAddress, NumberHelper.getInt(p1, 0));
                 System.out.println(result);
                 return;
             }
@@ -656,7 +658,7 @@ public class Main {
                 return;
             }
             if ("authedPullRequest".equals(operation)) {
-                String result = api.readCommunityPullRequest(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
+                String result = api.readCommunityPullRequest(fromAddress, contractAddress, NumberHelper.getInt(p1, 0));
                 System.out.println(result);
                 return;
             }
@@ -666,12 +668,12 @@ public class Main {
                 return;
             }
             if ("authedAccount".equals(operation)) {
-                boolean result = api.readAuthedAccount(fromAddress, contractAddress, arg0 = gasLimitStr);
+                boolean result = api.readAuthedAccount(fromAddress, contractAddress, p1);
                 System.out.println(result);
                 return;
             }
             if ("authedAccountList".equals(operation)) {
-                String result = api.readAuthedAccountList(fromAddress, contractAddress, NumberHelper.getInt(arg0 = gasLimitStr, 0));
+                String result = api.readAuthedAccountList(fromAddress, contractAddress, NumberHelper.getInt(p1, 0));
                 System.out.println(result);
                 return;
             }
@@ -693,14 +695,66 @@ public class Main {
             //
             long gasLimit = NumberHelper.getLong(gasLimitStr, 0);
             long gWei = NumberHelper.getLong(gweiStr, 0);
+            if ("create".equals(operation)) {
+                //hit pullRequest create gasLimit(500000) gWei -m 'comment' [startBranch] [endBranch]
+                String commentCmd = p3;// "-m"
+                String comment = p4; // comment content
+                String startBranch = p5;
+                String endBranch = p6;
+                // setting system property for transport.
+                System.setProperty("GIT_CMD", "pullRequest");
+                // commit is required.
+                if (!StringUtils.equals(commentCmd, "-m") || StringUtils.isBlank(comment)) {
+                    System.err.println("PullRequest comment is required, cmd: hit pullRequest create -m 'comment' [startBranch] [endBranch].");
+                    return;
+                }
+                // check if the repository has enabled the pull request.
+                String pullRequestAddress = repoApi.readPullRequestAddress(fromAddress, contractAddress);
+                if (StringUtils.isBlank(pullRequestAddress)) {
+                    System.err.println("The repository is not enable the pull request!");
+                    return;
+                }
+                String pullRequest = HitHelper.createPullRequest(projectDir, startBranch, endBranch);
+                if (StringUtils.isBlank(pullRequest)) {
+                    System.err.println("Can not create pull request!");
+                    return;
+                }
+                String prInfo = HitHelper.createPullRequestInfo("test", comment, new String[]{pullRequest});
+                if (StringUtils.isBlank(prInfo)) {
+                    System.err.println("Can not create pull request info!");
+                    return;
+                }
+                //
+                String result = api.writeAddPullRequest(prInfo, HitHelper.getAccountPriKeyWithPasswordInput(), pullRequestAddress, gasLimit, gWei);
+                System.out.println(result);
+                return;
+            }
             if ("enable".equals(operation)) {
+                //hit pullRequest enable               gasLimit(5000000)  gWei  [gasLimit(500000)]  [gWei] [-f]
+                // test privilege.
+                if (!StringUtils.equalsIgnoreCase(projectInfoFile.getOwnerAddressEcc(), HitHelper.getAccountAddress())) {
+                    if (!StringUtils.equalsIgnoreCase(repoApi.readDelegator(fromAddress, contractAddress), HitHelper.getAccountAddress())) {
+                        System.err.println("Only repository owner or delegator can enable pull request!");
+                        return;
+                    }
+                }
+                // check is has pull request.
+                String prAddress = repoApi.readPullRequestAddress(fromAddress, contractAddress);// 0x00000
+                if (StringUtils.isNotBlank(prAddress) && prAddress.startsWith("0x") && !Numeric.toBigInt(prAddress).equals(BigInteger.ZERO)) {
+                    String force = p6;
+                    if (!StringUtils.equals(force, "-f")) {
+                        System.err.println("This repository has enabled pull request, if you want to change pull request address add -f options!");
+                        return;
+                    }
+                }
+                // deploy the pull request contract.
                 String result = api.deployContract(HitHelper.getAccountPriKeyWithPasswordInput(), gasLimit, gWei);
                 if (ContractApi.isError(result)) {
                     System.out.println("Deploy pull request contract failed, error: " + result + "!");
                     return;
                 }
                 System.out.println("Pull request contract deploy success, contract address: " + result);
-                String result2 = RepositoryContractEthereumService.getApi().writeUpdatePullRequestAddress(result, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, NumberHelper.getLong(arg0, 500000), NumberHelper.getLong(arg1, 10));
+                String result2 = RepositoryContractEthereumService.getApi().writeUpdatePullRequestAddress(result, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, NumberHelper.getLong(p4, 500000), NumberHelper.getLong(p5, 10));
                 if (ContractApi.isError(result2)) {
                     System.out.println("Update pull request contract failed, error: " + result2 + "!");
                 } else {
@@ -709,27 +763,27 @@ public class Main {
                 return;
             }
             if ("changeOwner".equals(operation)) {
-                String result = api.writeChangeOwner(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                String result = api.writeChangeOwner(p3, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
                 System.out.println(result);
                 return;
             }
             if ("delegateTo".equals(operation)) {
-                String result = api.writeDelegateTo(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                String result = api.writeDelegateTo(p3, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
                 System.out.println(result);
                 return;
             }
             if ("addPullRequest".equals(operation)) {
-                String result = api.writeAddPullRequest(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                String result = api.writeAddPullRequest(p3, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
                 System.out.println(result);
                 return;
             }
             if ("addAuthedAccount".equals(operation)) {
-                String result = api.writeAddAuthedAccount(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                String result = api.writeAddAuthedAccount(p3, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
                 System.out.println(result);
                 return;
             }
             if ("removeAuthedAccount".equals(operation)) {
-                String result = api.writeRemoveAuthedAccount(arg0, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
+                String result = api.writeRemoveAuthedAccount(p3, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, gasLimit, gWei);
                 System.out.println(result);
                 return;
             }

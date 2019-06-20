@@ -78,7 +78,7 @@ public class EthereumHelper {
     }
 
     public static boolean hasTeamMember(String urlBase, String contractAddress, String memberAddress) {
-        return getApi().readHasTeamMember(HitHelper.getAccountAddress(), contractAddress, memberAddress);
+        return getApi().readTeamMember(HitHelper.getAccountAddress(), contractAddress, memberAddress);
     }
 
     public static String addTeamMember(String urlBase, String contractAddress, String memberAddress) {

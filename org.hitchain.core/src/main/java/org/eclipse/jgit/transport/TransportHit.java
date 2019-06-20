@@ -144,7 +144,8 @@ public class TransportHit extends HttpTransport implements WalkTransport {
         updateHitFile();
         updateOriginAfterInitPush();
         Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> uploadedGitFileIndex = hit.getUploadedGitFileIndex();
-        if (uploadedGitFileIndex.isEmpty()) {
+        boolean isPullRequest = StringUtils.equals(System.getProperty("GIT_CMD"), "pullRequest");
+        if (uploadedGitFileIndex.isEmpty() && !isPullRequest) {
             return;// this command is not the push command, maybe fetch.
         }
         File projectDir = local.getDirectory();
@@ -170,7 +171,13 @@ public class TransportHit extends HttpTransport implements WalkTransport {
         //for (Map.Entry<String, Two<Object, String, String>> entry : uploadedGitFileIndex.entrySet()) {
         //    System.out.println("Upload:" + entry.getKey() + ", ipfsHash:" + entry.getValue().first() + ", sha1:" + entry.getValue().second());
         //}
-        GitHelper.updateHitRepositoryGitFileIndex(projectDir, hit.getProjectInfoFile(), gitFileIndex, uploadedGitFileIndex);
+        if (isPullRequest) {
+            // Write to ipfs but not update the repository address.
+            GitHelper.updatePullRequestGitFileIndex(projectDir, hit.getProjectInfoFile(), gitFileIndex, uploadedGitFileIndex);
+        } else {
+            // Write to ipfs and update the repository address.
+            GitHelper.updateHitRepositoryGitFileIndex(projectDir, hit.getProjectInfoFile(), gitFileIndex, uploadedGitFileIndex);
+        }
     }
 
     private void updateHitFile() {
