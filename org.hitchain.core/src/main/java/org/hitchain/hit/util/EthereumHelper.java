@@ -50,7 +50,7 @@ public class EthereumHelper {
     public static String createContractForProject(String urlBase, String ownerAddressEcc, String projectName) {
         ///====create
         System.out.println("Contract is deploying...please wait for seconds...");
-        String address = getApi().deployContract(HitHelper.getAccountPriKeyWithPasswordInput(), 5000000, 10);
+        String address = getApi().deployContract(HitHelper.getAccountPriKeyWithPasswordInput(), HitHelper.getGasDeploy(), HitHelper.getGasDeployGwei());
         if (isError(address)) {
             return null;
         }

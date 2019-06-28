@@ -1,20 +1,32 @@
 package org.hitchain.hit.util;
 
+import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.client.utils.DateUtils;
 import org.bouncycastle.util.encoders.Hex;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.lib.TextProgressMonitor;
+import org.hitchain.contract.api.ContractApi;
+import org.hitchain.contract.api.PullRequestContractEthereumApi;
+import org.hitchain.contract.api.RepositoryContractEthereumApi;
+import org.hitchain.contract.ethereum.PullRequestContractEthereumService;
+import org.hitchain.contract.ethereum.RepositoryContractEthereumService;
 import org.hitchain.hit.api.ProjectInfoFile;
-import org.iff.infra.util.MapHelper;
+import org.iff.infra.util.*;
 
 import java.io.BufferedReader;
 import java.io.Console;
 import java.io.File;
 import java.io.InputStreamReader;
-import java.text.SimpleDateFormat;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -65,6 +77,7 @@ public class HitHelper {
     public static final String TYPE_recover = "recover";
     public static final String TYPE_chain = "chain";
     public static final String TYPE_chainapi = "chainapi";
+    public static final String TYPE_gas = "gas";
     //
     public static final String TYPE_member = "member";
     public static final String TYPE_keypair = "keypair";
@@ -323,8 +336,14 @@ public class HitHelper {
         {//init chain api
             Map<String, String> kv = getHitConfig().get(TYPE_chainapi);
             if (kv == null) {
-                chainAdd("test", "http://api-ropsten.etherscan.io/api");
-                chainAdd("main", "https://api.etherscan.io/api");
+                chainApiAdd("test", "http://api-ropsten.etherscan.io/api");
+                chainApiAdd("main", "https://api.etherscan.io/api");
+            }
+        }
+        {//init gas
+            Map<String, String> kv = getHitConfig().get(TYPE_gas);
+            if (kv == null) {
+                gasAdd("main", "5000000", "10", "500000", "10");
             }
         }
         return true;
@@ -652,6 +671,59 @@ public class HitHelper {
         return true;
     }
 
+    public static void gasInfo(String name) {
+        if (name == null) {
+            hitConfigInfo(TYPE_gas);
+            return;
+        }
+        Tuple.Two<String, String, String> two = getByName(getHitConfig(), TYPE_gas, name);
+        if (two == null) {
+            System.out.println("Can not find the gas name: " + name);
+            return;
+        }
+        System.out.println("The information by gas's name: " + name);
+        System.out.println("gas :" + two.first());
+        System.out.println("default   name:" + two.result());
+    }
+
+    public static boolean gasAdd(String name, String deployGasLimit, String deployGWei, String writeGasLimit, String writeGWei) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        if (StringUtils.isBlank(deployGasLimit) || StringUtils.isBlank(deployGWei) || StringUtils.isBlank(writeGasLimit) || StringUtils.isBlank(writeGWei)) {
+            System.out.println("deployGasLimit, deployGWei, writeGasLimit, writeGWei must has value.");
+            return false;
+        }
+        long gasDeploy = NumberHelper.getLong(deployGasLimit, 0);
+        long gweiDeploy = NumberHelper.getLong(deployGWei, 0);
+        long gasWrite = NumberHelper.getLong(writeGasLimit, 0);
+        long gweiWrite = NumberHelper.getLong(writeGWei, 0);
+        if (gasDeploy == 0 || gweiDeploy == 0 || gasWrite == 0 || gweiWrite == 0) {
+            System.out.println("deployGasLimit, deployGWei, writeGasLimit, writeGWei must has value.");
+            return false;
+        }
+        addByName(getHitConfig(), TYPE_gas, name, gasDeploy + "," + gweiDeploy + "," + gasWrite + "," + gweiWrite, null);
+        return true;
+    }
+
+    public static boolean gasRemove(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        return removeByName(getHitConfig(), TYPE_gas, name);
+    }
+
+    public static boolean gasSet(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        if (getByName(getHitConfig(), TYPE_gas, name) == null || !addByName(getHitConfig(), TYPE_gas, NAME_default, name, null)) {
+            System.out.println("Can not find the gas " + name + " config!");
+            return false;
+        }
+        return true;
+    }
+
     public static Map<String, Map<String, String>> getHitConfig() {
         return hitConfig == null ? hitConfig() : hitConfig;
     }
@@ -742,6 +814,35 @@ public class HitHelper {
     public static String getChainApi() {
         Tuple.Two<String, String, String> two = getDefaultValue(TYPE_chainapi);
         return two == null ? null : two.first();
+    }
+
+    public static String getGas() {
+        Tuple.Two<String, String, String> two = getDefaultValue(TYPE_gas);
+        return two == null ? null : two.first();
+    }
+
+    public static long getGasDeploy() {
+        Tuple.Two<String, String, String> two = getDefaultValue(TYPE_gas);
+        String gas = two == null ? null : two.first();
+        return Long.valueOf(StringUtils.split(gas, ",")[0]);
+    }
+
+    public static long getGasDeployGwei() {
+        Tuple.Two<String, String, String> two = getDefaultValue(TYPE_gas);
+        String gas = two == null ? null : two.first();
+        return Long.valueOf(StringUtils.split(gas, ",")[1]);
+    }
+
+    public static long getGasWrite() {
+        Tuple.Two<String, String, String> two = getDefaultValue(TYPE_gas);
+        String gas = two == null ? null : two.first();
+        return Long.valueOf(StringUtils.split(gas, ",")[2]);
+    }
+
+    public static long getGasWriteGwei() {
+        Tuple.Two<String, String, String> two = getDefaultValue(TYPE_gas);
+        String gas = two == null ? null : two.first();
+        return Long.valueOf(StringUtils.split(gas, ",")[3]);
     }
 
     public static String getAccountPubKey() {
@@ -1023,20 +1124,98 @@ public class HitHelper {
         System.out.println(sb);
     }
 
-    public static String createPullRequest(File gitDir, String startBranch, String endBranch) {
-        String pullRequestHash = null;
+    //
+
+    public static String enablePullRequest(File gitDir, boolean force) {
+        ProjectInfoFile projectInfoFile = HitHelper.getProjectInfoFile(gitDir);
+        PullRequestContractEthereumApi api = PullRequestContractEthereumService.getApi();
+        RepositoryContractEthereumApi repoApi = RepositoryContractEthereumService.getApi();
+        String fromAddress = HitHelper.getAccountAddress();
+        String repoContractAddress = projectInfoFile.getRepoAddress();
+        String contractAddress = repoApi.readPullRequestAddress(fromAddress, repoContractAddress);//maybe 0x00...000
+
+        if (!StringUtils.equalsIgnoreCase(projectInfoFile.getOwnerAddressEcc(), HitHelper.getAccountAddress())) {
+            if (!StringUtils.equalsIgnoreCase(repoApi.readDelegator(fromAddress, repoContractAddress), HitHelper.getAccountAddress())) {
+                System.err.println("Only repository owner or delegator can enable pull request!");
+                return null;
+            }
+        }
+        // check is has pull request.
+        if (ContractApi.isValidAddress(contractAddress)) {
+            if (force == false) {
+                System.err.println("This repository has enabled pull request, if you want to change pull request address add -f options!");
+                return null;
+            }
+        }
+        // deploy the pull request contract.
+        String result = api.deployContract(HitHelper.getAccountPriKeyWithPasswordInput(), HitHelper.getGasDeploy(), HitHelper.getGasDeployGwei());
+        if (ContractApi.isError(result)) {
+            System.out.println("Deploy pull request contract failed, error: " + result + "!");
+            return null;
+        }
+        contractAddress = result;
+        System.out.println("Pull request contract deploy success, contract address: " + contractAddress);
+        String result2 = repoApi.writeUpdatePullRequestAddress(contractAddress, HitHelper.getAccountPriKeyWithPasswordInput(), repoContractAddress, HitHelper.getGasWrite(), HitHelper.getGasWriteGwei());
+        if (ContractApi.isError(result2)) {
+            System.out.println("Update pull request contract failed, error: " + result2 + "!");
+        } else {
+            System.out.println("Pull request enable success.");
+        }
+        return contractAddress;
+    }
+
+    public static String createPullRequestCmd(File gitDir, String startBranch, String endBranch, String comment) {
+        ProjectInfoFile projectInfoFile = HitHelper.getProjectInfoFile(gitDir);
+        PullRequestContractEthereumApi api = PullRequestContractEthereumService.getApi();
+        RepositoryContractEthereumApi repoApi = RepositoryContractEthereumService.getApi();
+        String fromAddress = HitHelper.getAccountAddress();
+        String repoContractAddress = projectInfoFile.getRepoAddress();
+        String contractAddress = repoApi.readPullRequestAddress(fromAddress, repoContractAddress);//maybe 0x00...000
+
+        // setting system property for transport.
+        System.setProperty("GIT_CMD", "pullRequest");
+        // comment is required.
+        if (StringUtils.isBlank(comment)) {
+            System.err.println("PullRequest comment is required, cmd: hit pullRequest create -m 'comment' [startBranch] [endBranch].");
+            return null;
+        }
+        // check if the repository has enabled the pull request.
+        String pullRequestAddress = repoApi.readPullRequestAddress(fromAddress, repoContractAddress);
+        if (StringUtils.isBlank(pullRequestAddress)) {
+            System.err.println("The repository is not enable the pull request!");
+            return null;
+        }
+        Tuple.Two<Object, String, PatchHelper.PatchSummaryInfo> two = HitHelper.createPullRequest(gitDir, startBranch, endBranch, comment);
+        String pullRequest = two.first();
+        if (StringUtils.isBlank(pullRequest)) {
+            System.err.println("Can not create pull request!");
+            return null;
+        }
+        String prInfo = HitHelper.createPullRequestInfo(gitDir, startBranch, endBranch, comment, new Tuple.Two[]{two});
+        if (StringUtils.isBlank(prInfo)) {
+            System.err.println("Can not create pull request info!");
+            return null;
+        }
+        //
+        String result = api.writeAddPullRequest(prInfo, HitHelper.getAccountPriKeyWithPasswordInput(), pullRequestAddress, HitHelper.getGasWrite(), HitHelper.getGasWriteGwei());
+        return result;
+    }
+
+    public static Tuple.Two<Object, String, PatchHelper.PatchSummaryInfo> createPullRequest(File gitDir, String startBranch, String endBranch, String comment) {
+        Tuple.Two<Object, String, PatchHelper.PatchSummaryInfo> two = null;
         {// upload pull request patch
             startBranch = StringUtils.isBlank(startBranch) ? GitHelper.findDefaultRemoteBranch(gitDir) : startBranch;
             endBranch = StringUtils.isBlank(endBranch) ? GitHelper.findDefaultBranch(gitDir) : endBranch;
             System.out.println("Create pull request from start branch " + startBranch + " to end banch " + endBranch + ".");
-            byte[] bs = GitHelper.createPatch(gitDir, startBranch, endBranch);
-            if (bs == null || bs.length < 1) {
+            PatchHelper.PatchSummaryInfo patch = PatchHelper.createPatch(gitDir, startBranch, endBranch, comment);
+            if (patch.getPatchs().isEmpty()) {
                 System.err.println("Nothing changed of pull request from start branch " + startBranch + " to end banch " + endBranch + ".");
                 return null;
             }
-            System.out.println(new String(bs));
-            pullRequestHash = GitHelper.writeFileToIpfs(bs, "pullRequest.patch");
+            System.out.println(patch.getPatch());
+            String pullRequestHash = GitHelper.writeFileToIpfs(ByteHelper.utf8(patch.getPatch()), "pullRequest.patch");
             System.out.println("PullRequest: http://" + HitHelper.getStorage() + ":8080/ipfs/" + pullRequestHash);
+            two = new Tuple.Two<>(pullRequestHash, patch);
         }
         {// push repository
             try (Repository repo = new FileRepository(gitDir)) {
@@ -1045,20 +1224,33 @@ public class HitHelper {
                 throw new RuntimeException("HitHelper can not push the repository!", e);
             }
         }
-        return pullRequestHash;
+        return two;
     }
 
-    public static String createPullRequestInfo(String author, String comment, String[] pullRequests) {
-        Map info = MapHelper.toMap(
-                "url", "",
-                "author", author,
-                "author_address", "",
-                "author_pub_key", "",
-                "comment", comment,
-                "date", new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US).format(new Date()),
-                "pull_request", pullRequests
-        );
-        String prInfo = new GsonBuilder().setPrettyPrinting().create().toJson(info);
+    public static String createPullRequestInfo(File gitDir, String startBranch, String endBranch, String comment, Tuple.Two<Object, String, PatchHelper.PatchSummaryInfo>[] twos) {
+        List<Object> infos = new ArrayList<>();
+        String url = null, author = null;
+        ArrayList<Object> patches = new ArrayList<>();
+        try (Repository repo = new FileRepository(gitDir)) {
+            Config config = repo.getConfig();
+            String name = config.getString("user", null, "name");
+            String email = config.getString("user", null, "email");
+            if (name == null || email == null) {
+                author = "unknown";
+            } else {
+                author = name + " <" + email + ">";
+            }
+            url = config.getString("remote", "origin", "url");
+        } catch (Exception e) {
+            return null;
+        }
+        for (Tuple.Two<Object, String, PatchHelper.PatchSummaryInfo> two : twos) {
+            Map<String, Object> format = PatchHelper.format(two.second(), url, author, getAccountAddress(), getRsaPubKey());
+            format.put("patch_url", "http://" + HitHelper.getStorage() + ":8080/ipfs/" + two.first());
+            format.put("patch_hash", two.first());
+            infos.add(format);
+        }
+        String prInfo = new GsonBuilder().setPrettyPrinting().setDateFormat("EEE, dd MMM yyyy HH:mm:ss Z").create().toJson(infos);
         String prInfoHash = null;
         {// upload pull request info
             System.out.println(prInfo);
@@ -1066,5 +1258,458 @@ public class HitHelper {
             System.out.println("PullRequestInfo: http://" + HitHelper.getStorage() + ":8080/ipfs/" + prInfoHash);
         }
         return prInfoHash;
+    }
+
+    public static boolean pullRequestMerge(File gitDir, Map<String, Object> pullRequestSummaryInfo) {
+        File prDir = new File(gitDir, "pullrequest");
+        String currentBanch = null;
+        String branchName = null;
+        Repository repo = null;
+        Git git = null;
+        try {
+            repo = new FileRepository(gitDir);
+            git = new Git(repo);
+            prDir.mkdir();
+            currentBanch = repo.getBranch();
+            //String defaultBranch = GitHelper.findDefaultBranch(gitDir);
+            String commitName = (String) pullRequestSummaryInfo.get("start_commit");
+            branchName = "pr-" + commitName.substring(0, 5);
+            git.checkout().setCreateBranch(true).setName(branchName).setStartPoint(commitName).call();
+            System.out.println("Branch " + branchName + " is created for pull request.");
+            //if (!StringUtils.equals(commitName, (String) pullRequestSummaryInfo.get("start_commit"))) {
+            //    System.err.println("Current HEAD revision not match the pull request revision: " + (String) pullRequestSummaryInfo.get("start_commit"));
+            //    return false;
+            //}
+            byte[] patchBytes = GitHelper.readFileFromIpfs((String) pullRequestSummaryInfo.get("patch_hash"));
+            FileUtils.writeByteArrayToFile(new File(prDir, "pullrequest.patch"), patchBytes);
+            //git.apply().setPatch(new ByteArrayInputStream(patchBytes)).call();
+            System.out.println("Checkout merge branch: git checkout " + branchName);
+            System.out.println("Patch by hand: git am --ignore-space-change --ignore-whitespace .git/pullrequest/pullrequest.patch");
+            System.out.println("Remove Folder: rm -rf .git/pullrequest");
+            System.out.println("Switch to working branch: git checkout " + currentBanch);
+            System.out.println("merge: git merge " + branchName);
+            System.out.println("Remove pull request branch: git branch -d " + branchName);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            //FileUtils.deleteQuietly(prDir);
+            if (branchName != null && git != null) {
+                try {
+                    git.checkout().setCreateBranch(false).setName(currentBanch).call();
+                } catch (Exception e) {
+                }
+            }
+            SocketHelper.closeWithoutError(repo);
+        }
+        return true;
+    }
+
+    public static String migrateWithPullRequest(String gitUrl) {
+        String workDir = System.getProperty("git_work_tree");
+        System.out.println("Start to clone repository " + gitUrl + " ...");
+        try (Repository repo = Git.cloneRepository()
+                .setDirectory(StringUtils.isBlank(workDir) ? null : new File(workDir))
+                .setURI(gitUrl)
+                .setProgressMonitor(new TextProgressMonitor())
+                .call().getRepository()) {
+            System.out.println("Clone repository " + gitUrl + " success.");
+            Git git = new Git(repo);
+            StoredConfig config = repo.getConfig();
+            config.load();
+            config.setString("remote", "origin", "url", "hit://" + repo.getDirectory().getName() + ".git");
+            config.save();
+            System.out.println("Start to fetch pull request...");
+            List<PatchHelper.PatchSummaryInfo> summaryInfos = fetchPullRequest2(repo.getDirectory(), gitUrl);
+            System.out.println("Fetch pull request success.");
+            System.out.println("Start to push repository to hit...");
+            git.push().call();
+            System.out.println("Push repository to hit success.");
+            System.out.println("Start to enable pull request...");
+            String contractAddress = enablePullRequest(repo.getDirectory(), false);
+            System.out.println("Enable pull request success.");
+            System.out.println("Start to add pull request...");
+            File pullRequestFetch = new File(repo.getDirectory(), "pullrequest_fetch");
+            {//
+                List<Map<String, Object>> summaries = new ArrayList<>();
+                File[] files = pullRequestFetch.listFiles();
+                Map<String/*commitName*/, String/*ipfsHash*/> map = new HashMap<>();
+                for (File f : files) {
+                    if (!f.getName().endsWith(".patch")) {
+                        continue;
+                    }
+                    String ipfsHash = GitHelper.writeFileToIpfs(FileUtils.readFileToByteArray(f), f.getName());
+                    map.put(StringUtils.substringBefore(f.getName(), ".patch"), ipfsHash);
+                }
+                String url = null, author = null;
+                {
+                    String name = config.getString("user", null, "name");
+                    String email = config.getString("user", null, "email");
+                    if (name == null || email == null) {
+                        author = "unknown";
+                    } else {
+                        author = name + " <" + email + ">";
+                    }
+                    url = config.getString("remote", "origin", "url");
+                }
+                for (PatchHelper.PatchSummaryInfo psi : summaryInfos) {
+                    Map<String, Object> format = PatchHelper.format(psi, url, author, getAccountAddress(), getRsaPubKey());
+                    format.put("patch_url", "http://" + HitHelper.getStorage() + ":8080/ipfs/" + map.get(format.get("id")));
+                    format.put("patch_hash", map.get(format.get("id")));
+                    summaries.add(format);
+                }
+                String prInfo = new GsonBuilder().setPrettyPrinting().setDateFormat("EEE, dd MMM yyyy HH:mm:ss Z").create().toJson(summaries);
+                String prInfoHash = null;
+                {// upload pull request info
+                    prInfoHash = GitHelper.writeFileToIpfs(ByteHelper.utf8(prInfo), "pullRequestInfo.json");
+                    System.out.println("PullRequestInfo: http://" + HitHelper.getStorage() + ":8080/ipfs/" + prInfoHash);
+                    String writeAddPullRequest = PullRequestContractEthereumService.getApi().writeAddPullRequest(prInfoHash, getAccountPriKeyWithPasswordInput(), contractAddress, getGasWrite(), getGasWriteGwei());
+                    if (ContractApi.isError(writeAddPullRequest)) {
+                        System.err.println("Add pull request faild, error: " + writeAddPullRequest);
+                        return null;
+                    }
+                }
+            }
+            FileUtils.deleteQuietly(pullRequestFetch);
+            System.out.println("Add request success.");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+    public static String fetchPullRequest(File gitDir, String gitUrl) {
+        Gson gson = new GsonBuilder().setPrettyPrinting().setDateFormat("EEE, dd MMM yyyy HH:mm:ss Z").create();
+        if (StringUtils.contains(gitUrl, "gitee.com")) {
+            return gson.toJson(fetchPullRequestFromGiteeServer(gitDir, gitUrl));
+        }
+        return gson.toJson(fetchPullRequestFromGitServer(gitDir, gitUrl));
+    }
+
+    public static List<PatchHelper.PatchSummaryInfo> fetchPullRequest2(File gitDir, String gitUrl) {
+        if (StringUtils.contains(gitUrl, "gitee.com")) {
+            return fetchPullRequestFromGiteeServer(gitDir, gitUrl);
+        }
+        return fetchPullRequestFromGitServer(gitDir, gitUrl);
+    }
+
+    public static List<PatchHelper.PatchSummaryInfo> fetchPullRequestFromGitServer(File gitDir, String gitUrl) {
+        List<PatchHelper.PatchSummaryInfo> summaryInfos = new ArrayList<>();
+        String[] split = StringUtils.split(gitUrl, "/");
+        if (split.length < 2) {
+            System.err.println("Git url is invalided.");
+            return summaryInfos;
+        }
+        List<String> paths = Arrays.asList(split);
+        Collections.reverse(paths);
+        String repoName = StringUtils.remove(paths.get(0), ".git");
+        String owner = paths.get(1);
+        // pull url sample: https://api.github.com/repos/ethereum/ethereumj/pulls
+        String pullUrl = FCS.get("https://api.github.com/repos/{owner}/{repoName}/pulls?per_page=100", owner, repoName).toString();
+        String pullsJson = httpGet2(pullUrl, "Try fetch pull request for {times} times, url {url}.");
+        List<Map<String, Object>> pulls = GsonHelper.toJsonList(pullsJson);
+        for (Map<String, Object> pull : pulls) {
+            System.out.println("Fetching pull request:" + pull.get("url"));
+            // sample: https://github.com/ethereum/ethereumj/pull/1278.patch
+            String patchUrl = (String) pull.get("patch_url");
+            // sample: https://api.github.com/repos/ethereum/ethereumj/pulls/1278/commits
+            String commitsUrl = (String) pull.get("commits_url");
+            String startRevision = "refs/heads/" + (String) MapHelper.getByPath(pull, "base/ref");
+            String endtRevision = "refs/heads/" + (String) MapHelper.getByPath(pull, "head/ref");
+            String startCommit = (String) MapHelper.getByPath(pull, "base/sha");
+            String endCommit = (String) MapHelper.getByPath(pull, "head/sha");
+            String message = (String) pull.get("body");
+            //"created_at": "2019-05-01T09:59:35Z",
+            String dateStr = (String) pull.get("created_at");
+            Date date = DateUtils.parseDate(dateStr, new String[]{"yyyy-MM-dd'T'HH:mm:ss'Z'"});
+            //
+            String patchs = httpGet2(patchUrl, "Try fetch pull request patch for {times} times, url {url}.");
+            //
+            String commitsJson = httpGet2(commitsUrl, "Try fetch pull request commits for {times} times, url {url}.");
+            List<Map<String, Object>> commits = GsonHelper.toJsonList(commitsJson);
+            int commitIndex = 0, commitTotal = commits.size();
+            PatchHelper.PatchSummaryInfo summaryInfo = new PatchHelper.PatchSummaryInfo();
+            {
+                summaryInfos.add(summaryInfo);
+                summaryInfo.setStartRevision(startRevision);
+                summaryInfo.setEndRevision(endtRevision);
+                summaryInfo.setStartCommit(startCommit);
+                summaryInfo.setEndCommit(endCommit);
+                summaryInfo.setTotalCommit(commitTotal);
+                summaryInfo.setMessage(message);
+                summaryInfo.setDate(date);
+                summaryInfo.setPatch(patchs);
+            }
+            for (Map<String, Object> commit : commits) {
+                commitIndex += 1;
+                String base = (String) ((List<Map<String, Object>>) commit.get("parents")).get(0).get("sha");
+                String commitName = (String) commit.get("sha");
+                String msg = (String) MapHelper.getByPath(commit, "commit/message");
+                String shortMsg = StringUtils.substringBefore(msg, "\n");
+                String autor = (String) MapHelper.getByPath(commit, "commit/author/name") + " <" + (String) MapHelper.getByPath(commit, "commit/author/email") + ">";
+                int files = 0, insertions = 0, deletions = 0;
+                String summary = "", patch = "";
+                try {
+                    String[] lines = StringUtils.split(patchs, "\n");
+                    String starts = "From " + commitName;
+                    int mark = 0;
+                    StringBuilder sb = new StringBuilder();
+                    for (String line : lines) {
+                        if (line.startsWith(starts)) {
+                            mark = 1;
+                            continue;
+                        }
+                        if (mark == 1 && line.startsWith("---")) {
+                            mark = 2;
+                            continue;
+                        }
+                        if (mark != 2) {
+                            continue;
+                        }
+                        if (mark == 2 && line.startsWith("diff ")) {
+                            break;
+                        }
+                        {
+                            sb.append(line).append("\n");
+                            if (line.indexOf(" files changed") > 0 && (line.indexOf(" insertions") > 0 || line.indexOf(" deletions") > 0)) {
+                                String[] counts = StringUtils.split(line, ",");
+                                for (String count : counts) {
+                                    if (count.indexOf("files changed") > 0) {
+                                        files = NumberHelper.getInt(StringUtils.substringBefore(count, "files changed").trim(), 0);
+                                    } else if (count.indexOf(" insertions") > 0) {
+                                        insertions = NumberHelper.getInt(StringUtils.substringBefore(count, " insertions").trim(), 0);
+                                    } else if (count.indexOf(" deletions") > 0) {
+                                        deletions = NumberHelper.getInt(StringUtils.substringBefore(count, " deletions").trim(), 0);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    summary = sb.toString().trim();
+                } catch (Exception e) {
+                    System.err.println("Warning " + e.getMessage());
+                }
+                PatchHelper.PatchInfo patchInfo = new PatchHelper.PatchInfo();
+                patchInfo.setCommitIndex(commitIndex);
+                patchInfo.setCommitTotal(commitTotal);
+                patchInfo.setBase(base);
+                patchInfo.setCommit(commitName);
+                patchInfo.setShortMsg(shortMsg);
+                patchInfo.setMsg(msg);
+                patchInfo.setAuthor(autor);
+                patchInfo.setFiles(files);
+                patchInfo.setInsertions(insertions);
+                patchInfo.setDeletions(deletions);
+                patchInfo.setSummary(summary);
+                patchInfo.setPatch(patch);
+                summaryInfo.getPatchs().add(patchInfo);
+            }
+        }
+        String url = null, author = null;
+        try (Repository repo = new FileRepository(gitDir)) {
+            Config config = repo.getConfig();
+            String name = config.getString("user", null, "name");
+            String email = config.getString("user", null, "email");
+            if (name == null || email == null) {
+                author = "unknown";
+            } else {
+                author = name + " <" + email + ">";
+            }
+            url = config.getString("remote", "origin", "url");
+        } catch (Exception e) {
+        }
+
+        File pullRequestFetch = new File(gitDir, "pullrequest_fetch");
+        try {
+            pullRequestFetch.mkdir();
+            List<Map<String, Object>> summaries = new ArrayList<>();
+            for (PatchHelper.PatchSummaryInfo psi : summaryInfos) {
+                Map<String, Object> format = PatchHelper.format(psi, url, author, getAccountAddress(), getRsaPubKey());
+                summaries.add(format);
+                FileUtils.writeStringToFile(new File(pullRequestFetch, format.get("id") + ".patch"), psi.getPatch());
+            }
+            String json = new GsonBuilder().setPrettyPrinting().setDateFormat("EEE, dd MMM yyyy HH:mm:ss Z").create().toJson(summaries);
+            FileUtils.writeStringToFile(new File(pullRequestFetch, "patch-summary-info.json"), json);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return summaryInfos;
+    }
+
+    public static List<PatchHelper.PatchSummaryInfo> fetchPullRequestFromGiteeServer(File gitDir, String gitUrl) {
+        List<PatchHelper.PatchSummaryInfo> summaryInfos = new ArrayList<>();
+        String[] split = StringUtils.split(gitUrl, "/");
+        if (split.length < 2) {
+            System.err.println("Git url is invalided.");
+            return summaryInfos;
+        }
+        List<String> paths = Arrays.asList(split);
+        Collections.reverse(paths);
+        String repoName = StringUtils.remove(paths.get(0), ".git");
+        String owner = paths.get(1);
+        // pull url sample: https://gitee.com/api/v5/repos/jfinal/jfinal/pulls
+        String pullUrl = FCS.get("https://gitee.com/api/v5/repos/{owner}/{repoName}/pulls?per_page=100", owner, repoName).toString();
+        String pullsJson = httpGet2(pullUrl, "Try fetch pull request for {times} times, url {url}.");
+        List<Map<String, Object>> pulls = GsonHelper.toJsonList(pullsJson);
+        for (Map<String, Object> pull : pulls) {
+            System.out.println("Fetching pull request:" + pull.get("url"));
+            // sample: https://gitee.com/jfinal/jfinal/pulls/40.patch
+            String patchUrl = (String) pull.get("patch_url");
+            // sample: https://gitee.com/api/v5/repos/jfinal/jfinal/pulls/40/commits
+            String commitsUrl = (String) pull.get("commits_url");
+            String startRevision = "refs/heads/" + (String) MapHelper.getByPath(pull, "base/ref");
+            String endtRevision = "refs/heads/" + (String) MapHelper.getByPath(pull, "head/ref");
+            String startCommit = (String) MapHelper.getByPath(pull, "base/sha");
+            String endCommit = (String) MapHelper.getByPath(pull, "head/sha");
+            String message = (String) pull.get("body");
+            //created_at:"2019-04-18T13:12:57+08:00"
+            String dateStr = (String) pull.get("created_at");
+            Date date = DateUtils.parseDate(dateStr, new String[]{"yyyy-MM-dd'T'HH:mm:ssXXX"});
+            //
+            String patchs = httpGet2(patchUrl, "Try fetch pull request patch for {times} times, url {url}.");
+            //
+            String commitsJson = httpGet2(commitsUrl, "Try fetch pull request commits for {times} times, url {url}.");
+            List<Map<String, Object>> commits = GsonHelper.toJsonList(commitsJson);
+            int commitIndex = 0, commitTotal = commits.size();
+            PatchHelper.PatchSummaryInfo summaryInfo = new PatchHelper.PatchSummaryInfo();
+            {
+                summaryInfos.add(summaryInfo);
+                summaryInfo.setStartRevision(startRevision);
+                summaryInfo.setEndRevision(endtRevision);
+                summaryInfo.setStartCommit(startCommit);
+                summaryInfo.setEndCommit(endCommit);
+                summaryInfo.setTotalCommit(commitTotal);
+                summaryInfo.setMessage(message);
+                summaryInfo.setDate(date);
+                summaryInfo.setPatch(patchs);
+            }
+            for (Map<String, Object> commit : commits) {
+                commitIndex += 1;
+                String base = (String) MapHelper.getByPath(commit, "parents/sha");
+                String commitName = (String) commit.get("sha");
+                String msg = (String) MapHelper.getByPath(commit, "commit/message");
+                String shortMsg = StringUtils.substringBefore(msg, "\n");
+                String autor = (String) MapHelper.getByPath(commit, "commit/author/name") + " <" + (String) MapHelper.getByPath(commit, "commit/author/email") + ">";
+                int files = 0, insertions = 0, deletions = 0;
+                String summary = "", patch = "";
+                try {
+                    String[] lines = StringUtils.split(patchs, "\n");
+                    String starts = "From " + commitName;
+                    int mark = 0;
+                    StringBuilder sb = new StringBuilder();
+                    for (String line : lines) {
+                        if (line.startsWith(starts)) {
+                            mark = 1;
+                            continue;
+                        }
+                        if (mark == 1 && line.startsWith("---")) {
+                            mark = 2;
+                            continue;
+                        }
+                        if (mark != 2) {
+                            continue;
+                        }
+                        if (mark == 2 && line.startsWith("diff ")) {
+                            break;
+                        }
+                        {
+                            sb.append(line).append("\n");
+                            if (line.indexOf(" file changed") > 0 && (line.indexOf(" insertions") > 0 || line.indexOf(" deletions") > 0)) {
+                                String[] counts = StringUtils.split(line, ",");
+                                for (String count : counts) {
+                                    if (count.indexOf("file changed") > 0) {
+                                        files = NumberHelper.getInt(StringUtils.substringBefore(count, "file changed").trim(), 0);
+                                    } else if (count.indexOf(" insertions") > 0) {
+                                        insertions = NumberHelper.getInt(StringUtils.substringBefore(count, " insertions").trim(), 0);
+                                    } else if (count.indexOf(" deletions") > 0) {
+                                        deletions = NumberHelper.getInt(StringUtils.substringBefore(count, " deletions").trim(), 0);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    summary = sb.toString().trim();
+                } catch (Exception e) {
+                    System.err.println("Warning " + e.getMessage());
+                }
+                PatchHelper.PatchInfo patchInfo = new PatchHelper.PatchInfo();
+                patchInfo.setCommitIndex(commitIndex);
+                patchInfo.setCommitTotal(commitTotal);
+                patchInfo.setBase(base);
+                patchInfo.setCommit(commitName);
+                patchInfo.setShortMsg(shortMsg);
+                patchInfo.setMsg(msg);
+                patchInfo.setAuthor(autor);
+                patchInfo.setFiles(files);
+                patchInfo.setInsertions(insertions);
+                patchInfo.setDeletions(deletions);
+                patchInfo.setSummary(summary);
+                patchInfo.setPatch(patch);
+                summaryInfo.getPatchs().add(patchInfo);
+            }
+        }
+        String url = null, author = null;
+        try (Repository repo = new FileRepository(gitDir)) {
+            Config config = repo.getConfig();
+            String name = config.getString("user", null, "name");
+            String email = config.getString("user", null, "email");
+            if (name == null || email == null) {
+                author = "unknown";
+            } else {
+                author = name + " <" + email + ">";
+            }
+            url = config.getString("remote", "origin", "url");
+        } catch (Exception e) {
+        }
+
+        File pullRequestFetch = new File(gitDir, "pullrequest_fetch");
+        try {
+            pullRequestFetch.mkdir();
+            List<Map<String, Object>> summaries = new ArrayList<>();
+            for (PatchHelper.PatchSummaryInfo psi : summaryInfos) {
+                Map<String, Object> format = PatchHelper.format(psi, url, author, getAccountAddress(), getRsaPubKey());
+                summaries.add(format);
+                FileUtils.writeStringToFile(new File(pullRequestFetch, format.get("id") + ".patch"), psi.getPatch());
+            }
+            String json = new GsonBuilder().setPrettyPrinting().setDateFormat("EEE, dd MMM yyyy HH:mm:ss Z").create().toJson(summaries);
+            FileUtils.writeStringToFile(new File(pullRequestFetch, "patch-summary-info.json"), json);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return summaryInfos;
+    }
+
+    private static String httpGet2(String requestUrl, String tryMessage) {
+        String content = "";
+        for (int i = 0; i < 5; i++) {
+            if (tryMessage != null && i > 0) {
+                System.out.println(FCS.get(tryMessage, i, requestUrl));
+            }
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL(requestUrl);
+                {
+                    connection = (HttpURLConnection) url.openConnection();
+                    connection.setDoOutput(true);
+                    connection.setInstanceFollowRedirects(true);
+                    connection.setRequestMethod("GET");
+                    connection.setRequestProperty("charset", "UTF-8");
+                    connection.setRequestProperty("accept", "*/*");
+                    connection.setConnectTimeout(30 * 1000);
+                    connection.setReadTimeout(60 * 1000);
+                    connection.connect();
+                }
+                content = IOUtils.toString(connection.getInputStream(), "UTF-8");
+            } catch (Exception e) {
+            } finally {
+                try {
+                    connection.disconnect();
+                } catch (Exception e) {
+                }
+            }
+            if (StringUtils.isNotBlank(content)) {
+                return content;
+            }
+        }
+        return content;
     }
 }

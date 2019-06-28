@@ -9,7 +9,9 @@
 package org.hitchain.contract.api;
 
 import org.apache.commons.lang3.StringUtils;
+import org.web3j.utils.Numeric;
 
+import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -34,6 +36,14 @@ public interface ContractApi {
 
     public static ContractApi setInstance(Class<?> cls, ContractApi contractApi) {
         return ContractApi.instance.put(cls, contractApi);
+    }
+
+    public static boolean isValidAddress(String address) {
+        if (StringUtils.isBlank(address) || !StringUtils.startsWith(address, "0x")) {
+            return false;
+        }
+        BigInteger value = Numeric.toBigInt(address);
+        return !BigInteger.ZERO.equals(value);
     }
 
     /**

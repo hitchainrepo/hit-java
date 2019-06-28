@@ -19,25 +19,19 @@ import org.apache.commons.lang3.StringUtils;
 import org.bouncycastle.util.encoders.Hex;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListBranchCommand;
-import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.internal.storage.file.LockFile;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.hitchain.hit.api.EncryptableFileWrapper;
 import org.hitchain.hit.api.HashedFile;
 import org.hitchain.hit.api.ProjectInfoFile;
 import org.hitchain.hit.util.Tuple.Two;
 
 import java.io.*;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -476,6 +470,14 @@ public class GitHelper {
         }
     }
 
+    public static byte[] readFileFromIpfs(String hash) {
+        try {
+            return getIpfs().cat(Multihash.fromBase58(hash));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private static Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> parseGitFilesIndex(byte[] contentWithCompress) {
         Map<String, Two<Object, String, String>> map = new LinkedHashMap<>();
         if (contentWithCompress == null || contentWithCompress.length == 0) {
@@ -622,7 +624,7 @@ public class GitHelper {
      * @param endRev
      * @return
      */
-    public static byte[] createPatchByDefaultBranch(File gitDir, String startRev, String endRev) {
+    public static PatchHelper.PatchSummaryInfo createPatchByDefaultBranch(File gitDir, String startRev, String endRev, String comment) {
         if (StringUtils.isBlank(startRev)) {
             startRev = findDefaultRemoteBranch(gitDir);
         }
@@ -635,7 +637,7 @@ public class GitHelper {
         if (StringUtils.isBlank(endRev)) {
             throw new IllegalArgumentException("GitHelper end branch name need to specify!");
         }
-        return createPatch(gitDir, startRev, endRev);
+        return createPatch(gitDir, startRev, endRev, comment);
     }
 
     /**
@@ -644,73 +646,11 @@ public class GitHelper {
      * @param gitDir   git dir
      * @param startRev the start revision (no include)
      * @param endRev   the end revision.
+     * @param comment  patch comment.
      * @return
      */
-    public static byte[] createPatch(File gitDir, String startRev, String endRev) {
-        try (Repository repo = new FileRepository(gitDir)) {
-            Git git = new Git(repo);
-            RevWalk walk = new RevWalk(repo);
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            DiffFormatter df = new DiffFormatter(baos);
-            df.setRepository(repo);
-            Iterable<RevCommit> result = new Git(repo).log()
-                    .not(repo.resolve(startRev))
-                    .add(repo.resolve(endRev))
-                    .call();
-            List<RevCommit> commits = new ArrayList<>();
-            for (RevCommit rev : result) {
-                commits.add(rev);
-            }
-            Collections.reverse(commits);
-            RevCommit base = walk.parseCommit(repo.resolve(startRev).toObjectId());
-            AtomicInteger count = new AtomicInteger(0);
-            int total = commits.size();
-            for (RevCommit rev : commits) {
-                baos.write(formatEmailHeader(rev, count.incrementAndGet(), total).getBytes("UTF-8"));
-                df.format(base.getTree(), rev.getTree());
-                base = rev;
-            }
-            return baos.toByteArray();
-        } catch (Exception e) {
-            throw new RuntimeException("GitHelper can not create patch!", e);
-        }
-    }
-
-    private static String formatEmailHeader(RevCommit commit, int count, int total) {
-        StringBuilder b = new StringBuilder();
-        PersonIdent author = commit.getAuthorIdent();
-        String subject = commit.getShortMessage();
-        String msg = commit.getFullMessage().substring(subject.length());
-        if (msg.startsWith("\n\n")) {
-            msg = msg.substring(2);
-        }
-        b.append("From ")
-                .append(commit.getName())
-                .append(' ')
-                .append(
-                        "Mon Sep 17 00:00:00 2001\n") // Fixed timestamp to match output of C Git's format-patch
-                .append("From: ")
-                .append(author.getName())
-                .append(" <")
-                .append(author.getEmailAddress())
-                .append(">\n")
-                .append("Date: ")
-                .append(formatDate(author))
-                .append('\n')
-                .append("Subject: [PATCH " + count + "/" + total + "] ")
-                .append(subject)
-                .append('\n')
-                .append('\n')
-                .append(msg);
-        if (!msg.endsWith("\n")) {
-            b.append('\n');
-        }
-        return b.append("---\n\n").toString();
-    }
-
-    private static String formatDate(PersonIdent author) {
-        SimpleDateFormat df = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US);
-        df.setCalendar(Calendar.getInstance(author.getTimeZone(), Locale.US));
-        return df.format(author.getWhen());
+    public static PatchHelper.PatchSummaryInfo createPatch(File gitDir, String startRev, String endRev, String comment) {
+        PatchHelper.PatchSummaryInfo patch = PatchHelper.createPatch(gitDir, startRev, endRev, comment);
+        return patch;
     }
 }

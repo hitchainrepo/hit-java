@@ -4,7 +4,6 @@
  *
  * Contributors:
  *     <a href="mailto:iffiff1@gmail.com">Tyler Chen</a> - initial API and implementation.
- * Auto Generate By foreveross.com Quick Deliver Platform. 
  ******************************************************************************/
 package org.hitchain.hit.util;
 
@@ -24,7 +23,6 @@ import java.util.*;
  *
  * @author <a href="mailto:iffiff1@gmail.com">Tyler Chen</a>
  * @since 2019-02-19
- * auto generate by qdp.
  */
 public class JsonHelper {
     /* gson use yyyy-MM-dd'T'HH:mm:ss.SSSXXX date format */

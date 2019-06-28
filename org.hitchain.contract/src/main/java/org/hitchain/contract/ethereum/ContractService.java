@@ -369,7 +369,18 @@ public class ContractService implements ContractApi {
             if (send.hasError()) {
                 return "ERROR:" + send.getError().getMessage();
             }
-            String json = TransactionHelper.waitTransactionSeconds(getWeb3j(), send.getTransactionHash(), 60);
+            String json = null;
+            for (int i = 1; i <= 3; i++) {
+                json = TransactionHelper.waitTransactionSeconds(getWeb3j(), send.getTransactionHash(), 60);
+                if (StringUtils.contains(json, "\"ERROR\":") && StringUtils.contains(json, "timeout")) {
+                    System.out.println("Get transaction(" + i + "/3) " + send.getTransactionHash() + " timeout: " + json);
+                    continue;
+                }
+            }
+            if (StringUtils.contains(json, "\"ERROR\":") && StringUtils.contains(json, "timeout")) {
+                System.out.println("Get transaction " + send.getTransactionHash() + " timeout: " + json);
+                return json;
+            }
             TransactionReceipt receipt = null;
             try {
                 receipt = JsonHelper.toObject(TransactionReceipt.class, json);

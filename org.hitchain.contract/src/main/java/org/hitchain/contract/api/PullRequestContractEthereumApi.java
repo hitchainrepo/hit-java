@@ -103,15 +103,21 @@ public interface PullRequestContractEthereumApi extends ContractApi {
 
     /**
      * list community pull requests split by \n.
+     *
+     * @param fromAddress     the address to read contract
+     * @param contractAddress contract address
      * @return
      */
-    String listCommunityPR();
+    String listCommunityPR(String fromAddress, String contractAddress);
 
     /**
      * list authored pull requests split by \n.
+     *
+     * @param fromAddress     the address to read contract
+     * @param contractAddress contract address
      * @return
      */
-    String listAuthedPR();
+    String listAuthedPR(String fromAddress, String contractAddress);
 
     /**
      * Change the contract's Owner.
