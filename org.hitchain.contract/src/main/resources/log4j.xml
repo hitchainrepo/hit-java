@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE log4j:configuration PUBLIC "-//Apache//DTD Log4j 1.2//EN"
+                                    "http://logging.apache.org/log4j/docs/api/org/apache/log4j/xml/log4j.dtd">
+<log4j:configuration>
+	<appender class="org.apache.log4j.ConsoleAppender" name="RootConsoleAppender">
+		<param name="Threshold" value="debug,info" />
+		<layout class="org.iff.infra.util.ThreadIdPatternLayout">
+			<param name="ConversionPattern" value="%-d{yyyy-MM-dd HH:mm:ss} [%c:%L]-[%p] %m%n" />
+		</layout>
+	</appender>
+
+	<logger name="com.opensymphony.xwork2">
+		<level value="ERROR" />
+	</logger>
+
+	<logger name="org.apache.velocity">
+		<level value="FATAL" />
+	</logger>
+
+	<logger name="FOSS">
+		<level value="FATAL" />
+	</logger>
+
+	<logger name="DIST_LOCK">
+		<level value="FATAL" />
+	</logger>
+
+	<root>
+		<level value="FATAL" />
+		<appender-ref ref="RootConsoleAppender" />
+	</root>
+
+</log4j:configuration>

@@ -733,6 +733,9 @@
   <profiles>
     <profile>
       <id>javac</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
       <build>
         <plugins>
           <plugin>
@@ -800,7 +803,7 @@
     <profile>
       <id>ecj</id>
       <activation>
-        <activeByDefault>true</activeByDefault>
+        <activeByDefault>false</activeByDefault>
       </activation>
       <build>
         <plugins>
@@ -917,6 +920,8 @@
   </profiles>
 
   <modules>
+    <!--/*add by hit*/--><module>org.hitchain.contract</module><!--/*end of add*/-->
+    <!--/*add by hit*/--><module>org.hitchain.core</module><!--/*end of add*/-->
     <module>org.eclipse.jgit</module>
     <module>org.eclipse.jgit.ant</module>
     <module>org.eclipse.jgit.archive</module>
@@ -931,6 +936,7 @@
     <module>org.eclipse.jgit.junit.http</module>
     <module>org.eclipse.jgit.junit.ssh</module>
 
+    <module>org.hitchain.core.test</module>
     <module>org.eclipse.jgit.test</module>
     <module>org.eclipse.jgit.ant.test</module>
     <module>org.eclipse.jgit.http.test</module>
@@ -938,6 +944,7 @@
     <module>org.eclipse.jgit.lfs.test</module>
     <module>org.eclipse.jgit.lfs.server.test</module>
     <module>org.eclipse.jgit.ssh.apache.test</module>
+    <!--/*add by hit*/--><module>org.hitchain.pgm</module><!--/*end of add*/-->
   </modules>
 
 </project>
