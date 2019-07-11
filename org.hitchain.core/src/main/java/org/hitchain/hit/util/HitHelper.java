@@ -7,12 +7,10 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.utils.DateUtils;
 import org.bouncycastle.util.encoders.Hex;
+import org.eclipse.jgit.api.ApplyResult;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.lib.TextProgressMonitor;
+import org.eclipse.jgit.lib.*;
 import org.hitchain.contract.api.ContractApi;
 import org.hitchain.contract.api.PullRequestContractEthereumApi;
 import org.hitchain.contract.api.RepositoryContractEthereumApi;
@@ -21,10 +19,7 @@ import org.hitchain.contract.ethereum.RepositoryContractEthereumService;
 import org.hitchain.hit.api.ProjectInfoFile;
 import org.iff.infra.util.*;
 
-import java.io.BufferedReader;
-import java.io.Console;
-import java.io.File;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.*;
@@ -1073,10 +1068,6 @@ public class HitHelper {
             System.err.println(projectDir.getAbsolutePath() + " is invalid hit repository.");
             System.exit(1);
         }
-        if (!StringUtils.equals(HitHelper.getAccountAddress(), projectInfoFile.getOwnerAddressEcc())) {
-            System.err.println("Only owner can change this settings.");
-            System.exit(1);
-        }
         if (!projectInfoFile.verify(null)) {
             System.err.println("Project info file is not verify.");
             System.exit(1);
@@ -1260,7 +1251,7 @@ public class HitHelper {
         return prInfoHash;
     }
 
-    public static boolean pullRequestMerge(File gitDir, Map<String, Object> pullRequestSummaryInfo) {
+    public static boolean pullRequestMerge(File gitDir, Map<String, Object> pullRequestSummaryInfo, boolean ignoreSpaceChange, boolean ignoreWhitespace, boolean forceMergeLine, boolean noCommit) {
         File prDir = new File(gitDir, "pullrequest");
         String currentBanch = null;
         String branchName = null;
@@ -1273,6 +1264,7 @@ public class HitHelper {
             currentBanch = repo.getBranch();
             //String defaultBranch = GitHelper.findDefaultBranch(gitDir);
             String commitName = (String) pullRequestSummaryInfo.get("start_commit");
+            String currentBranch = repo.exactRef(Constants.HEAD).getTarget().getName();
             branchName = "pr-" + commitName.substring(0, 5);
             git.checkout().setCreateBranch(true).setName(branchName).setStartPoint(commitName).call();
             System.out.println("Branch " + branchName + " is created for pull request.");
@@ -1283,12 +1275,29 @@ public class HitHelper {
             byte[] patchBytes = GitHelper.readFileFromIpfs((String) pullRequestSummaryInfo.get("patch_hash"));
             FileUtils.writeByteArrayToFile(new File(prDir, "pullrequest.patch"), patchBytes);
             //git.apply().setPatch(new ByteArrayInputStream(patchBytes)).call();
-            System.out.println("Checkout merge branch: git checkout " + branchName);
-            System.out.println("Patch by hand: git am --ignore-space-change --ignore-whitespace .git/pullrequest/pullrequest.patch");
-            System.out.println("Remove Folder: rm -rf .git/pullrequest");
-            System.out.println("Switch to working branch: git checkout " + currentBanch);
-            System.out.println("merge: git merge " + branchName);
-            System.out.println("Remove pull request branch: git branch -d " + branchName);
+            {
+                List<PatchHelper.PatchFileInfo> patchFileInfos = PatchHelper.parsePatch(new ByteArrayInputStream(patchBytes));
+                for (PatchHelper.PatchFileInfo pfi : patchFileInfos) {
+                    ApplyResult call = ApplyHelper.createApply(repo)
+                            .ignoreSpaceChange(ignoreSpaceChange).ignoreWhitespace(ignoreWhitespace).forceMergeLine(forceMergeLine)
+                            .setPatch(new ByteArrayInputStream(pfi.diff().getBytes("UTF-8"))).call();
+                    if (!noCommit) {
+                        // Stage all files in the repo including new files
+                        git.add().addFilepattern(".").call();
+                        git.commit().setMessage(pfi.msg()).setAuthor(pfi.author(), pfi.email()).call();
+                        System.out.println("commit patched changes " + pfi.author() + " <" + pfi.email() + "> " + pfi.msg());
+                    }
+                }
+                git.checkout().setName(currentBanch).call();
+                //git.branchDelete().setBranchNames(branchName).setForce(true).call();
+                FileUtils.deleteQuietly(prDir);
+            }
+            //System.out.println("Checkout merge branch: git checkout " + branchName);
+            //System.out.println("Patch by hand: git am --ignore-space-change --ignore-whitespace .git/pullrequest/pullrequest.patch");
+            //System.out.println("Remove Folder: rm -rf .git/pullrequest");
+            //System.out.println("Switch to working branch: git checkout " + currentBanch);
+            System.out.println("Merge: hit merge " + branchName);
+            System.out.println("Remove pull request branch: hit branch -D " + branchName);
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
