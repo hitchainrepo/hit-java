@@ -9,12 +9,18 @@
 package org.hitchain.contract.ethereum;
 
 
+import org.apache.commons.io.IOUtils;
 import org.hitchain.contract.api.TokenApi;
 import org.hitchain.contract.api.TokenEthereumApi;
 import org.iff.infra.util.FCS;
-import org.iff.infra.util.RequestHelper;
 
-import java.util.Collections;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import java.io.DataOutputStream;
+import java.net.URL;
+import java.security.cert.CertificateException;
 
 /**
  * Token service for Ethereum implements TokenEthereumApi
@@ -31,10 +37,77 @@ public class TokenEthereumService extends TokenService implements TokenEthereumA
         return (TokenEthereumApi) TokenApi.getInstance();
     }
 
+    /**
+     * 绕过验证
+     *
+     * @return
+     */
+    public static SSLContext createIgnoreVerifySSL() throws Exception {
+        SSLContext sc = SSLContext.getInstance("SSLv3");
+
+        // 实现一个X509TrustManager接口，用于绕过验证，不用修改里面的方法
+        X509TrustManager trustManager = new X509TrustManager() {
+            public void checkClientTrusted(
+                    java.security.cert.X509Certificate[] paramArrayOfX509Certificate,
+                    String paramString) throws CertificateException {
+            }
+
+            public void checkServerTrusted(
+                    java.security.cert.X509Certificate[] paramArrayOfX509Certificate,
+                    String paramString) throws CertificateException {
+            }
+
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                return null;
+            }
+        };
+
+        sc.init(null, new TrustManager[]{trustManager}, null);
+        return sc;
+    }
+
     @Override
     public String requestTestToken(String address) {
         System.out.println("Please wait a while if has no error occurred, such as 60 seconds, and check the account.");
-        return RequestHelper.get("https://faucet.ropsten.be/donate/" + address, Collections.EMPTY_MAP, Collections.EMPTY_MAP).getBody();
+        String requestUrl = "https://faucet.metamask.io/";
+        String content = address;
+        for (int i = 0; i < 5; i++) {
+            HttpsURLConnection connection = null;
+            DataOutputStream wr = null;
+            try {
+                URL url = new URL(requestUrl);
+                {
+                    connection = (HttpsURLConnection) url.openConnection();
+                    connection.setSSLSocketFactory(createIgnoreVerifySSL().getSocketFactory());
+                    connection.setDoOutput(true);
+                    connection.setInstanceFollowRedirects(true);
+                    connection.setRequestMethod("POST");
+                    connection.setRequestProperty("origin", "https://faucet.metamask.io");
+                    connection.setRequestProperty("content-type", "application/rawdata");
+                    connection.setRequestProperty("referer", "https://faucet.metamask.io/");
+                    connection.setRequestProperty("authority", "faucet.metamask.io");
+                    connection.setRequestProperty("Content-Length", String.valueOf(content.length()));
+                    connection.setConnectTimeout(30 * 1000);
+                    connection.setReadTimeout(60 * 1000);
+                    {
+                        wr = new DataOutputStream(connection.getOutputStream());
+                        wr.writeBytes(content);
+                        wr.flush();
+                        IOUtils.closeQuietly(wr);
+                    }
+                    connection.connect();
+                }
+                return IOUtils.toString(connection.getInputStream(), "UTF-8");
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    connection.disconnect();
+                } catch (Exception e) {
+                }
+            }
+        }
+        return content;
     }
 
     @Override

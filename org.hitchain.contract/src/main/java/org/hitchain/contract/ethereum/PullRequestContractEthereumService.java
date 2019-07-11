@@ -157,11 +157,15 @@ public class PullRequestContractEthereumService extends ContractService implemen
 
     public String listCommunityPR(String fromAddress, String contractAddress) {
         StringBuilder sb = new StringBuilder();
-        List<Map<String, Object>> list = listAuthedPRs(fromAddress, contractAddress);
+        List<Map<String, Object>> list = listCommunityPRs(fromAddress, contractAddress);
         for (Map<String, Object> map : list) {
-            sb.append(StringUtils.leftPad((String) map.get("id"), 50, ' '));
-            sb.append(StringUtils.leftPad(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX").format(map.get("date")), 40, ' '));
-            sb.append(map.get("message")).append('\n');
+            sb.append(StringUtils.rightPad((String) map.get("id"), 42, ' '));
+            sb.append(StringUtils.rightPad(
+                    new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX").format(
+                            DateUtils.parseDate((String) map.get("date"), new String[]{"EEE, dd MMM yyyy HH:mm:ss Z"})), 27, ' '));
+            String message = (String) map.get("message");
+            message = StringUtils.substringBefore(message, "\n");
+            sb.append(message).append('\n');
         }
         return sb.toString();
     }

@@ -7,8 +7,9 @@
  ******************************************************************************/
 package org.hitchain.hit.util;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.client.utils.DateUtils;
+import org.apache.commons.lang3.time.DateUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
@@ -23,7 +24,6 @@ import org.iff.infra.util.HttpHelper;
 import org.iff.infra.util.MapHelper;
 
 import java.io.*;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,6 +42,90 @@ public class PatchHelper {
         String content = result.getBody();
         System.out.println(content);
         System.out.println(HttpHelper.get(url));
+    }
+
+    public static List<PatchFileInfo> parsePatch(InputStream in) {
+        List<PatchFileInfo> list = new ArrayList<>();
+        try {
+            String content = IOUtils.toString(in, "UTF-8");
+            String[] split = StringUtils.split(content, '\n');
+            boolean isHead = false, isSubject = false, isDiff = false;
+            StringBuilder msg = new StringBuilder();
+            StringBuilder diff = new StringBuilder();
+            PatchFileInfo pfi = null;
+            for (String s : split) {
+                if (s.startsWith("From ") && s.endsWith("Mon Sep 17 00:00:00 2001")) {
+                    if (isHead) {//new patch section
+                        isSubject = isDiff = false;
+                        pfi.diff(diff.toString());
+                        list.add(pfi);
+                        pfi = null;
+                        diff.setLength(0);
+                        msg.setLength(0);
+                    }
+                    isHead = true;
+                    pfi = new PatchFileInfo();
+                    String commit = StringUtils.substringBefore(StringUtils.substringAfter(s, "From ").trim(), " ");
+                    String dateStr = StringUtils.substringAfter(s, commit).trim();//Mon Sep 17 00:00:00 2001
+                    pfi.commit(commit).from(DateUtils.parseDate(dateStr, new String[]{"EEE MMM dd HH:mm:ss yyyy", "EEE, dd MMM yyyy HH:mm:ss Z", "yyyy-MM-dd'T'HH:mm:ssXXX"}));
+                    continue;
+                }
+                if (isHead && !isDiff && s.startsWith("From: ")) {
+                    String author = StringUtils.substringBefore(StringUtils.substringAfter(s, "From: ").trim(), " ");
+                    String email = StringUtils.substringBefore(StringUtils.substringAfter(s, "<"), ">").trim();
+                    pfi.author(author).email(email);
+                    continue;
+                }
+                if (isHead && !isDiff && s.startsWith("Date: ")) {
+                    String dateStr = StringUtils.substringAfter(s, "Date: ").trim();//Thu, 3 Jan 2019 19:24:33 +0800
+                    Date date = DateUtils.parseDate(dateStr, new String[]{"EEE MMM dd HH:mm:ss yyyy", "EEE, dd MMM yyyy HH:mm:ss Z", "yyyy-MM-dd'T'HH:mm:ssXXX"});
+                    pfi.date(date);
+                    continue;
+                }
+                if (isHead && !isDiff && s.startsWith("Subject: ")) {
+                    isSubject = true;
+                    String shortMsg = StringUtils.substringAfter(s, "]").trim();
+                    pfi.shortMsg(shortMsg);
+                    continue;
+                }
+                if (isHead && isSubject && !isDiff) {
+                    if (!s.equals("---")) {
+                        msg.append(s).append("\n");
+                    } else {
+                        isHead = isSubject = false;
+                        String message = msg.toString();
+                        pfi.msg(StringUtils.isBlank(message) ? pfi.shortMsg() : message.trim());
+                    }
+                    continue;
+                }
+                if (!isHead && !isSubject && !isDiff && (s.startsWith("diff --git ") || s.startsWith("diff --cc ") || s.startsWith("diff --combined "))) {
+                    isDiff = true;
+                    diff.append(s).append('\n');
+                    continue;
+                }
+                if (isDiff) {
+                    if (s.equals("-- ")) {//jgit
+                        isDiff = false;
+                        continue;
+                    }
+                    if (s.equals("--")) {//libgit2
+                        isDiff = false;
+                        continue;
+                    }
+                    diff.append(s).append('\n');
+                }
+            }
+            if (pfi != null) {
+                pfi.diff(diff.toString());
+                list.add(pfi);
+                pfi = null;
+                diff.setLength(0);
+                msg.setLength(0);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return list;
     }
 
     public static PatchSummaryInfo createPatch(File gitDir, String startRev, String endRev, String comment) {
@@ -199,7 +283,7 @@ public class PatchHelper {
                     "{changeDetail}\n" +//
                     " {files} files changed, {insertions} insertions(+), {deletions} deletions(-)\n\n" +//
                     "{diff}\n" +//
-                    "--\n";
+                    "-- \n";
 
             List<String> changeDetail = new ArrayList<>();
             int files = 0;
@@ -477,4 +561,115 @@ public class PatchHelper {
             this.patchs = patchs;
         }
     }
+
+    public static class PatchFileInfo implements Serializable {
+        /*From 303f4fab121188669451c624d073f95488ff1219 Mon Sep 17 00:00:00 2001*/
+        protected Date from;
+        /*From 303f4fab121188669451c624d073f95488ff1219 Mon Sep 17 00:00:00 2001*/
+        protected String commit;
+        /*From: jolestar <jolestar@gmail.com>*/
+        protected String author;
+        /*From: jolestar <jolestar@gmail.com>*/
+        protected String email;
+        /*Date: Thu, 3 Jan 2019 19:24:33 +0800*/
+        protected Date date;
+        /*Subject: [PATCH 1/2] fix https://github.com/ethereum/ethereumj/issues/1248*/
+        protected String shortMsg;
+        protected String msg;
+        protected String diff;
+
+        public String commit() {
+            return commit;
+        }
+
+        public PatchFileInfo commit(String commit) {
+            this.commit = commit;
+            return this;
+        }
+
+        public Date from() {
+            return from;
+        }
+
+        public PatchFileInfo from(Date from) {
+            this.from = from;
+            return this;
+        }
+
+        public String author() {
+            return author;
+        }
+
+        public PatchFileInfo author(String author) {
+            this.author = author;
+            return this;
+        }
+
+        public String email() {
+            return email;
+        }
+
+        public PatchFileInfo email(String email) {
+            this.email = email;
+            return this;
+        }
+
+        public Date date() {
+            return date;
+        }
+
+        public PatchFileInfo date(Date date) {
+            this.date = date;
+            return this;
+        }
+
+        public String shortMsg() {
+            return shortMsg;
+        }
+
+        public PatchFileInfo shortMsg(String shortMsg) {
+            this.shortMsg = shortMsg;
+            return this;
+        }
+
+        public String msg() {
+            return msg;
+        }
+
+        public PatchFileInfo msg(String msg) {
+            this.msg = msg;
+            return this;
+        }
+
+        public String diff() {
+            return diff;
+        }
+
+        public PatchFileInfo diff(String diff) {
+            this.diff = diff;
+            return this;
+        }
+
+        @Override
+        public String toString() {
+            String patchInfo = "" +//
+                    "From {commitName} Mon Sep 17 00:00:00 2001\n" +//Fixed timestamp to match output of C Git's format-patch
+                    "From: {authorName} <{authorEmail}>\n" +//
+                    "Date: {date}\n" +//
+                    "Subject: [PATCH] {subject}\n" +//
+                    "\n" +//
+                    "{msg}\n" +//
+                    "---\n" +//
+                    "{diff}\n" +//
+                    "-- \n";
+            return FCS.get(patchInfo,
+                    commit,
+                    author, email,
+                    date == null ? "" : new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z").format(date),
+                    shortMsg,
+                    msg,
+                    diff).toString();
+        }
+    }
+
 }

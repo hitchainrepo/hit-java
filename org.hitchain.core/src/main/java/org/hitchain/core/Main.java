@@ -125,9 +125,8 @@ public class Main {
             "hit pullRequest authedAccount accountAddress\n" +
             "hit pullRequest authedAccountList  index\n" +
             "hit pullRequest authedAccountCount\n" +
-            "hit pullRequest listCommunityPR\n" +
-            "hit pullRequest listAuthedPR" +
-            "hit pullRequest merge id" +
+            "hit pullRequest listCommunity\n" +
+            "hit pullRequest listAuthed" +
             "hit pullRequest fetch gitUrl" +
             "hit pullRequest enable [-f]\n" +
             "hit pullRequest changeOwner          ownerAddress\n" +
@@ -136,19 +135,21 @@ public class Main {
             "hit pullRequest addAuthedAccount     accountAddress\n" +
             "hit pullRequest removeAuthedAccount  accountAddress\n";
     public static final String HELP_MIGRATE = "" +
-            "hit migrate gitUrl\n";
+            "hit migrate gitUrl\n" +
+            "hit am pullRequestId [--ignore-space-change] [--ignore-white-sapce] [--force-merge]\n";
 
-    public static void main(String[] args) throws Exception {
-//        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/mergepr/hellopr");
+    public static void main0(String[] args) throws Exception {
+        //        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/mergepr/hellopr");
 //        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/mergepr/migrate");
 //        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/migratetest/jfinal");
 //        args = new String[]{"pullRequest", "create", "5000000", "10", "-m", "test pull request"};
-//        args = new String[]{"pr", "listAuthedPR"};
-//        args = new String[]{"pr", "merge", "05c6a12b7f6bd6a16ad57cbbefa8fff56cf330c4"};
+//        args = new String[]{"pr", "listAuthed"};
+//        args = new String[]{"am", "05c6a12b7f6bd6a16ad57cbbefa8fff56cf330c4"};
 //        args = new String[]{"pr", "fetch", "https://github.com/ethereum/ethereumj.git"};
 //        args = new String[]{"pr", "fetch", "https://gitee.com/jfinal/jfinal.git"};
 //        args = new String[]{"migrate", "https://gitee.com/jfinal/jfinal.git"};
-        System.out.println("ARG:" + Arrays.toString(args));
+//        args = new String[]{"token", "readToken", "0xf49ac47ae8b8ad61a5fa3858224969e07c35f3fa"};
+//        System.out.println("ARG:" + Arrays.toString(args));
         {
             System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.client.protocol.ResponseProcessCookies", "fatal");
         }
@@ -159,7 +160,8 @@ public class Main {
                     "cfg", new HashSet<>(Arrays.asList("account", "rsa")),
                     "repo", new HashSet<>(Arrays.asList("keypair", "member")),
                     "contract", new HashSet<>(Arrays.asList("deploy", "init", "initWithDelegator", "updateRepositoryName", "updateRepositoryAddress", "addTeamMember", "removeTeamMember", "changeOwner", "delegateTo")),
-                    "pullRequest", new HashSet<>(),
+                    "pullRequest", new HashSet<>(Arrays.asList("create", "enable", "changeOwner", "delegateTo", "addPullRequest", "addAuthedAccount", "removeAuthedAccount")),
+                    "pr", new HashSet<>(Arrays.asList("create", "enable", "changeOwner", "delegateTo", "addPullRequest", "addAuthedAccount", "removeAuthedAccount")),
                     "push", new HashSet<>(),
                     "fetch", new HashSet<>(),
                     "migrate", new HashSet<>()
@@ -602,18 +604,6 @@ public class Main {
         }
         /*-----------------------------------------------------token-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "token".equals(args[0])) {
-            File projectDir = null;
-            {
-                String workDir = System.getProperty("git_work_tree");
-                if (workDir == null) {
-                    workDir = ".";
-                }
-                projectDir = new File(workDir + "/.git");
-            }
-            if (projectDir == null || !projectDir.exists()) {
-                System.err.println(projectDir.getAbsolutePath() + " is invalid git dir.");
-                System.exit(1);
-            }
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
             if (list.isEmpty()) {
@@ -744,49 +734,16 @@ public class Main {
                 System.out.println(result);
                 return;
             }
-            if ("listCommunityPR".equals(operation)) {
-                //hit pullRequest listCommunityPR
+            if ("listCommunity".equals(operation)) {
+                //hit pullRequest listCommunity
                 String result = api.listCommunityPR(fromAddress, contractAddress);
                 System.out.println(result);
                 return;
             }
-            if ("listAuthedPR".equals(operation)) {
-                //hit pullRequest listAuthedPR
+            if ("listAuthed".equals(operation)) {
+                //hit pullRequest listAuthed
                 String result = api.listAuthedPR(fromAddress, contractAddress);
                 System.out.println(result);
-                return;
-            }
-            if ("merge".equals(operation)) {
-                //hit pullRequest merge id
-                if (StringUtils.isBlank(p1)) {
-                    System.err.println("Pull request id is required!");
-                    return;
-                }
-                Map<String, Object> prForMerge = null;
-                List<Map<String, Object>> prs = PullRequestContractEthereumService.listAuthedPRs(fromAddress, contractAddress);
-                for (Map<String, Object> pr : prs) {
-                    if (StringUtils.equals(p1, (String) pr.get("id"))) {
-                        prForMerge = pr;
-                        break;
-                    }
-                }
-                if (prForMerge == null) {
-                    prs = PullRequestContractEthereumService.listCommunityPRs(fromAddress, contractAddress);
-                    for (Map<String, Object> pr : prs) {
-                        if (StringUtils.equals(p1, (String) pr.get("id"))) {
-                            prForMerge = pr;
-                            break;
-                        }
-                    }
-                }
-                if (prForMerge == null) {
-                    System.err.println("Pull request for id:" + p1 + " not found!");
-                    return;
-                }
-                boolean result = HitHelper.pullRequestMerge(projectDir, prForMerge);
-                if (Boolean.TRUE.equals(result)) {
-                    System.out.println("Apply pull request success, you need to merge this branch to the main branch by using git merge command.");
-                }
                 return;
             }
             if ("fetch".equals(operation)) {
@@ -858,9 +815,86 @@ public class Main {
             }
             System.out.println(HELP_MIGRATE);
             return;
+        }
+        /*-----------------------------------------------------am-----------------------------------------------------*/
+        else if (args != null && args.length > 0 && "am".equals(args[0])) {
+            File projectDir = null;
+            {
+                String workDir = System.getProperty("git_work_tree");
+                if (workDir == null) {
+                    workDir = ".";
+                }
+                projectDir = new File(workDir + "/.git");
+            }
+            if (projectDir == null || !projectDir.exists()) {
+                System.err.println(projectDir.getAbsolutePath() + " is invalid git dir.");
+                System.exit(1);
+            }
+
+            LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
+            list.poll();// remove am
+            if (list.isEmpty()) {
+                list.add(HitHelper.TYPE_help);
+            }
+            String id = list.poll();// Operation, enable, help
+            String p1 = list.poll(), p2 = list.poll(), p3 = list.poll(), p4 = list.poll();
+            if (StringUtils.isBlank(id)) {
+                System.out.println(HELP_MIGRATE);
+                return;
+            }
+
+            boolean ignoreSpaceChange = StringUtils.equalsAny("--ignore-space-change", p1, p2, p3, p4);
+            boolean ignoreWhitespace = StringUtils.equalsAny("--ignore-white-sapce", p1, p2, p3, p4);
+            boolean forceMergeLine = StringUtils.equalsAny("--force-merge", p1, p2, p3, p4);
+            boolean noCommit = StringUtils.equalsAny("--no-commit", p1, p2, p3, p4);
+
+            //
+            //
+            ProjectInfoFile projectInfoFile = HitHelper.getProjectInfoFile(projectDir);
+            PullRequestContractEthereumApi api = PullRequestContractEthereumService.getApi();
+            RepositoryContractEthereumApi repoApi = RepositoryContractEthereumService.getApi();
+            String fromAddress = HitHelper.getAccountAddress();
+            String repoContractAddress = projectInfoFile.getRepoAddress();
+            String contractAddress = repoApi.readPullRequestAddress(fromAddress, repoContractAddress);//maybe 0x00...000
+            boolean hasPrContract = StringUtils.isNotBlank(contractAddress) && contractAddress.startsWith("0x") && !Numeric.toBigInt(contractAddress).equals(BigInteger.ZERO);
+            contractAddress = hasPrContract ? contractAddress : null;
+
+            Map<String, Object> prForMerge = null;
+            List<Map<String, Object>> prs = PullRequestContractEthereumService.listAuthedPRs(fromAddress, contractAddress);
+            for (Map<String, Object> pr : prs) {
+                if (StringUtils.equals(id, (String) pr.get("id"))) {
+                    prForMerge = pr;
+                    break;
+                }
+            }
+            if (prForMerge == null) {
+                prs = PullRequestContractEthereumService.listCommunityPRs(fromAddress, contractAddress);
+                for (Map<String, Object> pr : prs) {
+                    if (StringUtils.equals(id, (String) pr.get("id"))) {
+                        prForMerge = pr;
+                        break;
+                    }
+                }
+            }
+            if (prForMerge == null) {
+                System.err.println("Pull request for id:" + id + " not found!");
+                return;
+            }
+            boolean result = HitHelper.pullRequestMerge(projectDir, prForMerge, ignoreSpaceChange, ignoreWhitespace, forceMergeLine, noCommit);
+            if (Boolean.TRUE.equals(result)) {
+                System.out.println("Apply pull request success, you need to merge this branch to the main branch by using git merge command.");
+            }
+
+            System.out.println(HELP_MIGRATE);
+            return;
         } else {
             Class<?> main = Class.forName("org.eclipse.jgit.pgm.Main");
             main.getMethod(HitHelper.TYPE_main, String[].class).invoke(null, new Object[]{args});
         }
+    }
+
+    public static void main(String[] args) throws Exception {
+        main0(args);
+        System.exit(0);
     }
 }
