@@ -8,23 +8,12 @@
  ******************************************************************************/
 package org.hitchain.core;
 
-import io.ipfs.api.IPFS;
-import io.ipfs.multihash.Multihash;
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jgit.api.Hit;
 import org.eclipse.jgit.transport.URIish;
-import org.hitchain.hit.api.HashedFile;
-import org.hitchain.hit.api.ProjectInfoFile;
-import org.hitchain.hit.util.EthereumHelper;
-import org.hitchain.hit.util.GitHelper;
-import org.hitchain.hit.util.HitHelper;
-import org.hitchain.hit.util.Tuple;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Map;
 
 /**
  * HitURIish
@@ -56,38 +45,13 @@ public class HitURIish extends URIish {
             return humanishName;
         }
         try {
-            String host = getHost();
-            String path = getRawPath();
-            if (StringUtils.isBlank(path)) {
-                path = host;
-                host = HitHelper.getRepository();
-            } else {
-                host = "https://" + host;
+            humanishName = Hit.repositoryName().uri(toString()).call();
+            if (StringUtils.isBlank(humanishName)) {
+                throw new IllegalArgumentException("Not repository found for: " + toString());
             }
-            String contractAddress = StringUtils.removeEnd(StringUtils.removeStart(path, "/"), ".git");
-            String projectAddress = EthereumHelper.getProjectAddress(host, contractAddress);
-            if (StringUtils.isNotBlank(projectAddress) && !EthereumHelper.isError(projectAddress)) {// is valid contract address and have content.
-                String gitFileIndexHash = projectAddress;
-                IPFS ipfs = GitHelper.getIpfs();
-                Map<String/* filename */, Tuple.Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
-                {
-                    gitFileIndex.put(GitHelper.HIT_GITFILE_IDX, new Tuple.Two<>(gitFileIndexHash, ""));
-                }
-                Tuple.Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get(GitHelper.HIT_PROJECT_INFO);
-                if (StringUtils.isNotBlank(ipfsHashAndSha1.first())) {
-                    byte[] cat = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
-                    ProjectInfoFile projectInfoFile = ProjectInfoFile.fromFile(
-                            new HashedFile.FileWrapper(GitHelper.HIT_PROJECT_INFO, new HashedFile.InputStreamCallback() {
-                                public InputStream call(HashedFile hashedFile) throws IOException {
-                                    return new ByteArrayInputStream(cat);
-                                }
-                            }));
-                    return humanishName = projectInfoFile.getRepoName();
-                }
-            }
+            return humanishName;
         } catch (Exception e) {
             throw new IllegalArgumentException(e);
         }
-        throw new IllegalArgumentException("Not repository found for: " + toString());
     }
 }
