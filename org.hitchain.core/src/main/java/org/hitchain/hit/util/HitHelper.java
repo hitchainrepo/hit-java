@@ -14,6 +14,7 @@ import org.eclipse.jgit.lib.*;
 import org.hitchain.contract.api.ContractApi;
 import org.hitchain.contract.api.PullRequestContractEthereumApi;
 import org.hitchain.contract.api.RepositoryContractEthereumApi;
+import org.hitchain.contract.ethereum.HitRepositoryContractEthereumService;
 import org.hitchain.contract.ethereum.PullRequestContractEthereumService;
 import org.hitchain.contract.ethereum.RepositoryContractEthereumService;
 import org.hitchain.hit.api.ProjectInfoFile;
@@ -73,6 +74,7 @@ public class HitHelper {
     public static final String TYPE_chain = "chain";
     public static final String TYPE_chainapi = "chainapi";
     public static final String TYPE_gas = "gas";
+    public static final String TYPE_contract = "contract";
     //
     public static final String TYPE_member = "member";
     public static final String TYPE_keypair = "keypair";
@@ -80,6 +82,7 @@ public class HitHelper {
     public static final String ACTION_add = "add";
     public static final String ACTION_remove = "remove";
     public static final String ACTION_set = "set";
+    public static final String ACTION_deploy = "deploy";
     //
     public static final String ACTION_renew = "renew";
 
@@ -160,7 +163,13 @@ public class HitHelper {
         }
     }
 
-    public static Tuple.Two<String, String, String> getByName(Map<String/*section*/, Map<String/*name*/, String/*value*/>> config, String section, String name) {
+    /**
+     * @param config
+     * @param section
+     * @param name
+     * @return Tuple.Two[String, String: value1, String: value2]
+     */
+    public static Tuple.Two<String, String/*value1*/, String/*value2*/> getByName(Map<String/*section*/, Map<String/*name*/, String/*value*/>> config, String section, String name) {
         if (config.isEmpty()) {
             return null;
         }
@@ -183,7 +192,7 @@ public class HitHelper {
             two.result(kv.get(NAME_default));
             return two;
         }
-        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main, TYPE_gas, TYPE_contract
             if (!kv.containsKey(name)) {
                 return null;
             }
@@ -223,7 +232,7 @@ public class HitHelper {
             kv.put(pri, value2);
             return true;
         }
-        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main, TYPE_gas, TYPE_contract
             if (NAME_default.equals(name)) {
                 kv.put(name, value1);
                 return true;
@@ -260,7 +269,7 @@ public class HitHelper {
             }
             return true;
         }
-        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main, TYPE_gas, TYPE_contract
             kv.remove(name);
             if (name.equals(StringUtils.trim(kv.get(NAME_default)))) {
                 kv.put(NAME_default, "");
@@ -719,6 +728,64 @@ public class HitHelper {
         return true;
     }
 
+    public static void contractInfo(String name) {
+        if (name == null) {
+            hitConfigInfo(TYPE_contract);
+            return;
+        }
+        Tuple.Two<String, String, String> two = getByName(getHitConfig(), TYPE_contract, name);
+        if (two == null) {
+            System.out.println("Can not find the contract name: " + name);
+            return;
+        }
+        System.out.println("The information by contract's name: " + name);
+        System.out.println("contract :" + two.first());
+        System.out.println("default   name:" + two.result());
+    }
+
+    public static boolean contractAdd(String name, String address) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        if (StringUtils.isBlank(address)) {
+            System.out.println("Contract address must has value.");
+            return false;
+        }
+        addByName(getHitConfig(), TYPE_contract, name, address, null);
+        return true;
+    }
+
+    public static boolean contractDeploy(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        String address = HitRepositoryContractEthereumService.getApi().deployContract(getAccountPriKeyWithPasswordInput(), getGasDeploy(), getGasDeployGwei());
+        if (StringUtils.isBlank(address) || ContractApi.isError(address)) {
+            System.out.println("Can not deploy contract.");
+            return false;
+        }
+        addByName(getHitConfig(), TYPE_contract, name, address, null);
+        return true;
+    }
+
+    public static boolean contractRemove(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        return removeByName(getHitConfig(), TYPE_contract, name);
+    }
+
+    public static boolean contractSet(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        if (getByName(getHitConfig(), TYPE_contract, name) == null || !addByName(getHitConfig(), TYPE_contract, NAME_default, name, null)) {
+            System.out.println("Can not find the contract " + name + " config!");
+            return false;
+        }
+        return true;
+    }
+
     public static Map<String, Map<String, String>> getHitConfig() {
         return hitConfig == null ? hitConfig() : hitConfig;
     }
@@ -838,6 +905,12 @@ public class HitHelper {
         Tuple.Two<String, String, String> two = getDefaultValue(TYPE_gas);
         String gas = two == null ? null : two.first();
         return Long.valueOf(StringUtils.split(gas, ",")[3]);
+    }
+
+    public static String getContract() {
+        Tuple.Two<String, String, String> two = getDefaultValue(TYPE_contract);
+        String contract = two == null ? null : two.first();
+        return contract;
     }
 
     public static String getAccountPubKey() {
