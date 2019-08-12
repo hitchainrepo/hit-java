@@ -12,15 +12,16 @@ import io.ipfs.api.IPFS;
 import io.ipfs.api.MerkleNode;
 import io.ipfs.multihash.Multihash;
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jgit.api.Hit;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.transport.URIish;
+import org.hitchain.contract.api.ContractApi;
 import org.hitchain.hit.api.DecryptableFileWrapper;
 import org.hitchain.hit.api.EncryptableFileWrapper;
 import org.hitchain.hit.api.HashedFile;
 import org.hitchain.hit.api.ProjectInfoFile;
-import org.hitchain.hit.util.EthereumHelper;
 import org.hitchain.hit.util.GitHelper;
 import org.hitchain.hit.util.HitHelper;
 import org.hitchain.hit.util.Tuple.Two;
@@ -48,55 +49,52 @@ public class HitIPFSStorage {
     private Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> gitFileIndex;
     private Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> uploadedGitFileIndex = new HashMap<>();
 
-    public HitIPFSStorage(File projectDir, URIish uri) {
-        this.projectDir = projectDir;
+    public HitIPFSStorage(File gitDir, URIish uri) {
+        this.projectDir = gitDir;
         this.uri = uri;
-        if (!GitHelper.isValidHitRepository(projectDir)) {
+        if (!GitHelper.isValidHitRepository(gitDir)) {// so this is the empty repository (clone)
             String host = uri.getHost();
             String path = uri.getRawPath();
             if (StringUtils.isBlank(path)) {
                 path = host;
-                host = HitHelper.getRepository();
-            } else {
-                host = "https://" + host;
             }
-            String contractAddress = StringUtils.removeEnd(StringUtils.removeStart(path, "/"), ".git");
-            String projectAddress = EthereumHelper.getProjectAddress(host, contractAddress);
-            if (StringUtils.isNotBlank(projectAddress) && !EthereumHelper.isError(projectAddress)) {// is valid contract address and have content.
-                String gitFileIndexHash = projectAddress;
-                ipfs = GitHelper.getIpfs();
-                gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
-                {
-                    gitFileIndex.put(GitHelper.HIT_GITFILE_IDX, new Two<>(gitFileIndexHash, ""));
-                }
-                Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get(GitHelper.HIT_PROJECT_INFO);
-                if (StringUtils.isNotBlank(ipfsHashAndSha1.first())) {
-                    try {
-                        byte[] cat = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
-                        projectInfoFile = ProjectInfoFile.fromFile(
-                                new HashedFile.FileWrapper(GitHelper.HIT_PROJECT_INFO, new HashedFile.ByteArrayInputStreamCallback(cat)));
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }
+            String hitUri = path;
+            if (!Hit.util().isValidHitUri(hitUri)) {
+                throw new RuntimeException("Invalid hit uri: " + uri.toString());
             }
-        } else {
-            projectInfoFile = GitHelper.readProjectInfoFile(projectDir);
-        }
-
-        if (projectInfoFile == null) {
-            GitHelper.onInitHitRepository(projectDir);
-            projectInfoFile = GitHelper.readProjectInfoFile(projectDir);
-        }
-
-        {
-            String projectAddress = EthereumHelper.getProjectAddress(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress());
-            String gitFileIndexHash = projectAddress;
-            ipfs = GitHelper.getIpfs(projectInfoFile.getFileServerUrl());
+            String url = Hit.util().readUrl(hitUri);
+            if (StringUtils.isBlank(url) || ContractApi.isError(url)) {// is invalid contract address and have no content.
+                throw new RuntimeException("Invalid contract or invalid repository: " + uri.toString());
+            }
+            String gitFileIndexHash = url;
+            ipfs = GitHelper.getIpfs();
             gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
             {
                 gitFileIndex.put(GitHelper.HIT_GITFILE_IDX, new Two<>(gitFileIndexHash, ""));
             }
+            Two<Object, String/* ipfs hash */, String/* sha1 */> ipfsHashAndSha1 = gitFileIndex.get(GitHelper.HIT_PROJECT_INFO);
+            try {
+                byte[] cat = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
+                projectInfoFile = ProjectInfoFile.fromFile(
+                        new HashedFile.FileWrapper(GitHelper.HIT_PROJECT_INFO, new HashedFile.ByteArrayInputStreamCallback(cat)));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            return;
+        }
+
+        projectInfoFile = GitHelper.readProjectInfoFile(gitDir);
+
+        String hitUri = projectInfoFile.getRepoAddress();
+        if (!Hit.util().isValidHitUri(hitUri)) {
+            throw new RuntimeException("Invalid hit uri: " + uri.toString());
+        }
+        String url = Hit.util().readUrl(hitUri);
+        String gitFileIndexHash = url;
+        ipfs = GitHelper.getIpfs(projectInfoFile.getFileServerUrl());
+        gitFileIndex = GitHelper.readGitFileIndexFromIpfs(ipfs, gitFileIndexHash);
+        {
+            gitFileIndex.put(GitHelper.HIT_GITFILE_IDX, new Two<>(gitFileIndexHash, ""));
         }
     }
 
