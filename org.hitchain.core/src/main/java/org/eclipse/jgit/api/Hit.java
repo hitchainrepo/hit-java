@@ -43,7 +43,6 @@
  */
 package org.eclipse.jgit.api;
 
-import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jgit.lib.Repository;
 import org.hitchain.hit.api.ProjectInfoFile;
 import org.hitchain.hit.util.HitHelper;
@@ -103,6 +102,11 @@ public class Hit extends HitEx {
         return new RepositoryNameCommand();
     }
 
+    /**
+     * should only call by Main entrance or migrate.
+     *
+     * @return
+     */
     public static CreateRepositoryCommand createRepository() {
         return new CreateRepositoryCommand();
     }
@@ -111,16 +115,24 @@ public class Hit extends HitEx {
         return new TokenCommand();//.account(StringUtils.defaultIfBlank(account, HitHelper.getAccountAddress()))
     }
 
+    public static MigrateCommand migrate() {
+        return new MigrateCommand();
+    }
+
+    public static UtilCommand util() {
+        return new UtilCommand();
+    }
+
+    public StoredConfigCommand storedConfig() {
+        return new StoredConfigCommand().repository(getRepository());
+    }
+
     public KeypairCommand keypair() {
         return new KeypairCommand().hit(this);
     }
 
     public AmCommand am() {
         return new AmCommand().hit(this);
-    }
-
-    public static MigrateCommand migrate() {
-        return new MigrateCommand();
     }
 
     public HitRepositoryContractCommand contract() {
