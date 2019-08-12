@@ -9,20 +9,22 @@ package org.hitchain.core;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.commons.lang3.time.DateUtils;
 import org.eclipse.jgit.api.Hit;
 import org.eclipse.jgit.api.HitConfigCommand;
 import org.eclipse.jgit.api.HitRepositoryContractCommand;
 import org.eclipse.jgit.api.KeypairCommand;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
 import org.hitchain.contract.api.HitRepositoryContractEthereumApi;
-import org.hitchain.contract.ethereum.HitRepositoryContractEthereumService;
 import org.hitchain.hit.util.HitHelper;
 import org.iff.infra.util.MapHelper;
 import org.iff.infra.util.NumberHelper;
+import org.iff.infra.util.Tuple;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
@@ -117,22 +119,25 @@ public class Main {
             "hit am pathId [--ignore-space-change|--ignore-white-sapce|--force-merge|--no-commit]\n";
     public static final String HELP_MIGRATE = "" +
             "hit migrate help\n" +
-            "hit migrate uri\n";
+            "hit migrate [--auto-rename] [--name repositoryName] [--token authorizationToken] uri\n";
+    public static final String HELP_PULLREQUEST = "" +
+            "hit pullrequest help\n" +
+            "hit pullrequest create -m 'comment' [startBranch] [endBranch]\n";
 
     public static void main0(String[] args) throws Exception {
         //        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/mergepr/hellopr");
 //        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/mergepr/migrate");
-//        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/migratetest/jfinal");
+//        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/migratetest/json-editor");
 //        args = new String[]{"pullRequest", "create", "5000000", "10", "-m", "test pull request"};
 //        args = new String[]{"pr", "listAuthed"};
 //        args = new String[]{"am", "05c6a12b7f6bd6a16ad57cbbefa8fff56cf330c4"};
 //        args = new String[]{"pr", "fetch", "https://github.com/ethereum/ethereumj.git"};
 //        args = new String[]{"pr", "fetch", "https://gitee.com/jfinal/jfinal.git"};
-//        args = new String[]{"migrate", "https://gitee.com/jfinal/jfinal.git"};
+//        args = new String[]{"migrate", "--auto-rename", "https://github.com/jdorn/json-editor.git"};
 //        args = new String[]{"token", "readToken", "0xf49ac47ae8b8ad61a5fa3858224969e07c35f3fa"};
-        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/hellonew");
-        args = new String[]{"push"};
-        System.out.println("ARG:" + Arrays.toString(args));
+//        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/helloworld");
+//        args = new String[]{"contract", "add-repository", "--auto-rename"};
+//        System.out.println("ARG:" + Arrays.toString(args));
         {
             System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.client.protocol.ResponseProcessCookies", "fatal");
         }
@@ -149,6 +154,8 @@ public class Main {
                     )),
                     "encrypt", new HashSet<>(),
                     "migrate", new HashSet<>(),
+                    "pullrequest", new HashSet<>(Arrays.asList("create")),
+                    "pr", new HashSet<>(Arrays.asList("create")),
                     "push", new HashSet<>(),
                     "fetch", new HashSet<>()
             );
@@ -169,6 +176,7 @@ public class Main {
             System.out.println(HELP_ENCRYPT);
             System.out.println(HELP_AM);
             System.out.println(HELP_MIGRATE);
+            System.out.println(HELP_PULLREQUEST);
         }
         //
         if (args != null && args.length > 0 && "cfg".equals(args[0])) {
@@ -369,32 +377,14 @@ public class Main {
             }
             if ("add-repository".equals(operation)) {
                 File file = tryGetGitDirectory();
-                String repositoryName = p1;
+                boolean autoRename = StringUtils.containsAny("--auto-rename", p1, p2);
+                String repositoryName = "--auto-rename".equals(p1) ? p2 : p1;
                 if (StringUtils.isBlank(repositoryName) && file != null) {
                     repositoryName = file.getParentFile().getName();
                 }
-                if (StringUtils.isNotBlank(repositoryName)) {
-                    String result = Hit.createRepository().name(repositoryName).call();
-                    if (file != null) {
-                        String contract = HitHelper.getContract();
-                        HitRepositoryContractEthereumApi api = HitRepositoryContractEthereumService.getApi();
-                        int repoId = api.readIdByName(HitHelper.getAccountAddress(), HitHelper.getContract(), repositoryName);
-                        String hitUri = "hit://" + contract + "-" + repoId + ".git";
-
-                        StoredConfig config = new FileRepository(file).getConfig();
-                        config.load();
-                        String uri = config.getString("remote", "origin", "url");
-                        // if is blank or is not the right hit uri then change the uri to the right hit uri.
-                        if (!(StringUtils.isBlank(uri) || (uri.startsWith("hit://") && !StringUtils.contains(uri, contract)))) {
-                            return;
-                        }
-                        config.setString("remote", "origin", "url", hitUri);
-                        config.save();
-                        System.out.println("Update remote origin url to " + hitUri);
-                    }
-                    System.out.println(result);
-                } else {
-                    System.err.println("Can not find repository.");
+                String hitUri = HitHelper.createRepository(file, repositoryName, autoRename);
+                if (StringUtils.isBlank(hitUri)) {
+                    System.err.println("Can not create repository.");
                 }
                 return;
             }
@@ -597,31 +587,89 @@ public class Main {
             }
             //========================================
             if ("list-repository".equals(operation)) {
-                System.out.println(cmd.listRepositories());
+                StringBuilder sb = new StringBuilder();
+                List<Tuple.Three<Object, String/*contract*/, Integer/*id*/, String/*name*/>> results = cmd.listRepositories();
+                for (Tuple.Three<Object, String/*contract*/, Integer/*id*/, String/*name*/> three : results) {
+                    sb.append(StringUtils.rightPad(three.second().toString(), 5)).append(' ').append(three.third()).append('\n');
+                }
+                System.out.println(sb);
                 return;
             }
             if ("list-history-url".equals(operation)) {
-                System.out.println(cmd.listHistoryUrls());
+                StringBuilder sb = new StringBuilder();
+                List<Tuple.Three<Object, String/*from*/, Date/*date*/, String/*url*/>> results = cmd.listHistoryUrls();
+                for (Tuple.Three<Object, String/*from*/, Date/*date*/, String/*url*/> three : results) {
+                    sb.append(DateFormatUtils.format(three.second(), "yyyy-MM-dd HH:mm:ss")).append("  ")
+                            .append(three.first()).append("  ")
+                            .append(three.third()).append('\n');
+                }
+                System.out.println(sb);
                 return;
             }
             if ("list-member".equals(operation)) {
-                System.out.println(cmd.listMembers());
+                StringBuilder sb = new StringBuilder();
+                List<Tuple.Two<Object, String/*member*/, Boolean/*status*/>> results = cmd.listMembers();
+                for (Tuple.Two<Object, String/*member*/, Boolean/*status*/> two : results) {
+                    sb.append(two.first()).append("  ").append(Boolean.TRUE.equals(two.second()) ? "Enabled" : "Disabled").append('\n');
+                }
+                System.out.println(sb);
                 return;
             }
             if ("list-pr-member".equals(operation)) {
-                System.out.println(cmd.listPrMembers());
+                StringBuilder sb = new StringBuilder();
+                List<Tuple.Two<Object, String/*member*/, Boolean/*status*/>> results = cmd.listPrMembers();
+                for (Tuple.Two<Object, String/*member*/, Boolean/*status*/> two : results) {
+                    sb.append(two.first()).append("  ").append(Boolean.TRUE.equals(two.second()) ? "Enabled" : "Disabled").append('\n');
+                }
+                System.out.println(sb);
                 return;
             }
             if ("list-pr".equals(operation)) {
-                System.out.println(cmd.listPullRequests());
+                StringBuilder sb = new StringBuilder();
+                List<Map<String, Object>> results = cmd.listPullRequests();
+                for (Map<String, Object> map : results) {
+                    sb.append(StringUtils.rightPad((String) map.get("id"), 42));
+                    sb.append(StringUtils.rightPad((String) map.get("pr_type"), 11));
+                    sb.append(StringUtils.rightPad(
+                            new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX").format(
+                                    DateUtils.parseDate((String) map.get("date"), new String[]{"EEE, dd MMM yyyy HH:mm:ss Z"})), 27));
+                    String message = (String) map.get("message");
+                    message = StringUtils.substringBefore(message, "\n");
+                    sb.append(message).append('\n');
+                }
+                System.out.println(sb);
                 return;
             }
             if ("list-pr-auth".equals(operation)) {
-                System.out.println(cmd.listAuthoredPullRequests());
+                StringBuilder sb = new StringBuilder();
+                List<Map<String, Object>> results = cmd.listAuthoredPullRequests();
+                for (Map<String, Object> map : results) {
+                    sb.append(StringUtils.rightPad((String) map.get("id"), 42));
+                    sb.append("authored   ");
+                    sb.append(StringUtils.rightPad(
+                            new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX").format(
+                                    DateUtils.parseDate((String) map.get("date"), new String[]{"EEE, dd MMM yyyy HH:mm:ss Z"})), 27));
+                    String message = (String) map.get("message");
+                    message = StringUtils.substringBefore(message, "\n");
+                    sb.append(message).append('\n');
+                }
+                System.out.println(sb);
                 return;
             }
             if ("list-pr-comm".equals(operation)) {
-                System.out.println(cmd.listCommunityPullRequests());
+                StringBuilder sb = new StringBuilder();
+                List<Map<String, Object>> results = cmd.listCommunityPullRequests();
+                for (Map<String, Object> map : results) {
+                    sb.append(StringUtils.rightPad((String) map.get("id"), 42));
+                    sb.append("community  ");
+                    sb.append(StringUtils.rightPad(
+                            new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX").format(
+                                    DateUtils.parseDate((String) map.get("date"), new String[]{"EEE, dd MMM yyyy HH:mm:ss Z"})), 27));
+                    String message = (String) map.get("message");
+                    message = StringUtils.substringBefore(message, "\n");
+                    sb.append(message).append('\n');
+                }
+                System.out.println(sb);
                 return;
             }
             System.out.println(HELP_CONTRACT);
@@ -636,10 +684,9 @@ public class Main {
             }
             String type = list.poll();// eth, hit, request-test, help
             String p1 = list.poll();
-            File gitDir = tryGetGitDirectory();
             if ("eth".equals(type)) {
                 String account = p1;
-                if (StringUtils.isBlank(account) && gitDir != null) {
+                if (StringUtils.isBlank(account)) {
                     account = HitHelper.getAccountAddress();
                 }
                 if (StringUtils.isNotBlank(account)) {
@@ -651,7 +698,7 @@ public class Main {
             }
             if ("hit".equals(type)) {
                 String account = p1;
-                if (StringUtils.isBlank(account) && gitDir != null) {
+                if (StringUtils.isBlank(account)) {
                     account = HitHelper.getAccountAddress();
                 }
                 if (StringUtils.isNotBlank(account)) {
@@ -663,7 +710,7 @@ public class Main {
             }
             if ("request-test".equals(type)) {
                 String account = p1;
-                if (StringUtils.isBlank(account) && gitDir != null) {
+                if (StringUtils.isBlank(account)) {
                     account = HitHelper.getAccountAddress();
                 }
                 if (StringUtils.isNotBlank(account)) {
@@ -705,10 +752,60 @@ public class Main {
         }
         /*-----------------------------------------------------migrate-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "migrate".equals(args[0])) {
-            if (args.length > 1 && StringUtils.isNotBlank(args[1])) {
-                Hit.migrate().call();
+            LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
+            list.poll();
+            if (list.isEmpty()) {
+                list.add(HitHelper.TYPE_help);
+            }
+            boolean autoRename = false;
+            String name = null;
+            String token = null;
+            String uri = null;
+            for (int i = 0; i < list.size(); i++) {
+                if ("--auto-rename".equals(list.get(i))) {
+                    autoRename = true;
+                    list.remove(i);
+                    i = i - 1;
+                }
+            }
+            for (int i = 0; i < list.size(); i++) {
+                if ("--name".equals(list.get(i))) {
+                    {// remove options, so list.get(i) = name value.
+                        list.remove(i);
+                    }
+                    if (list.size() > i) {
+                        name = list.remove(i);
+                    } else {
+                        System.err.println("migrate option --name missing value.");
+                        System.out.println(HELP_MIGRATE);
+                        return;
+                    }
+                    i = i - 1;
+                }
+            }
+            for (int i = 0; i < list.size(); i++) {
+                if ("--token".equals(list.get(i))) {
+                    {// remove options, so list.get(i) = token value.
+                        list.remove(i);
+                    }
+                    if (list.size() > i) {
+                        token = list.remove(i);
+                    } else {
+                        System.err.println("migrate option --token missing value.");
+                        System.out.println(HELP_MIGRATE);
+                        return;
+                    }
+                    i = i - 1;
+                }
+            }
+            if (list.size() > 0) {
+                uri = list.get(0);
+            } else {
+                System.err.println("migrate missing uri.");
+                System.out.println(HELP_MIGRATE);
                 return;
             }
+            Hit.migrate().uri(uri).autoRename(autoRename).name(name).token(token).call();
             System.out.println(HELP_MIGRATE);
             return;
         }
@@ -736,6 +833,31 @@ public class Main {
             hit.am().patchId(id).ignoreSpaceChange(ignoreSpaceChange).ignoreWhitespace(ignoreWhitespace).forceMergeLine(forceMergeLine).noCommit(noCommit).call();
             IOUtils.closeQuietly(hit);
             return;
+        }
+        /*-----------------------------------------------------am-----------------------------------------------------*/
+        else if (args != null && args.length > 0 && ("pullrequest".equals(args[0]) || "pr".equals(args[0]))) {
+            File gitDir = getGitDirectory();
+            LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
+            list.poll();
+            if (list.isEmpty()) {
+                list.add(HitHelper.TYPE_help);
+            }
+            String operation = list.poll();// create, help
+            String p1 = list.poll(), p2 = list.poll(), p3 = list.poll(), p4 = list.poll();
+            if (HitHelper.TYPE_help.equals(operation)) {
+                System.out.println(HELP_PULLREQUEST);
+                return;
+            }
+            if ("create".equals(operation)) {
+                //hit pullRequest create -m 'comment' [startBranch] [endBranch]
+                String commentCmd = p1;// "-m"
+                String comment = p2; // comment content
+                String startBranch = p3;
+                String endBranch = p4;
+                String result = HitHelper.createPullRequestCmd(gitDir, startBranch, endBranch, StringUtils.equals(commentCmd, "-m") ? comment : null);
+                System.out.println(result);
+                return;
+            }
         } else {
             Class<?> main = Class.forName("org.eclipse.jgit.pgm.Main");
             main.getMethod(HitHelper.TYPE_main, String[].class).invoke(null, new Object[]{args});
@@ -747,7 +869,7 @@ public class Main {
         {
             String workDir = System.getProperty("git_work_tree");
             if (workDir == null) {
-                workDir = ".";
+                workDir = new File("").getAbsolutePath();
             }
             projectDir = new File(workDir + "/.git");
         }
@@ -767,7 +889,12 @@ public class Main {
     }
 
     public static void main(String[] args) throws Exception {
-        main0(args);
+        try {
+            main0(args);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
         System.exit(0);
     }
 }

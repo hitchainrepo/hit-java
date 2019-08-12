@@ -459,7 +459,7 @@ public interface HitRepositoryContractEthereumApi extends ContractApi {
      * @param fromAddress     the address to read contract
      * @param contractAddress contract address
      * @param id              repository id
-     * @return List[Tuple.Three[Object, String: member, Boolean: status]]
+     * @return List[Map]
      */
     List<Map<String,Object>> listPullRequests(String fromAddress, String contractAddress, int id);
 
