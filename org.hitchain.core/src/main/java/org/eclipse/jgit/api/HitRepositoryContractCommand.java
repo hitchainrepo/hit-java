@@ -55,7 +55,7 @@ public class HitRepositoryContractCommand implements Callable<Hit> {
 
     public int repositoryId() {
         String repoAddress = hit().projectInfoFile().getRepoAddress();
-        return Integer.valueOf(StringUtils.substringAfter(repoAddress, "-"));
+        return repoAddress.indexOf('-') < 0 ? -1 : Integer.valueOf(StringUtils.substringAfter(repoAddress, "-"));
     }
 
     public long gasLimit() {
@@ -379,7 +379,7 @@ public class HitRepositoryContractCommand implements Callable<Hit> {
     /**
      * Get pull requests.
      *
-     * @return List[Tuple.Three[Object, String: member, Boolean: status]]
+     * @return List[Map]
      */
     public List<Map<String, Object>> listPullRequests() {
         return api.listPullRequests(fromAddress(), contractAddress(), repositoryId());
