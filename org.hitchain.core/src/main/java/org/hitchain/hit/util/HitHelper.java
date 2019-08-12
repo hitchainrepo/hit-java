@@ -9,13 +9,14 @@ import org.apache.http.client.utils.DateUtils;
 import org.bouncycastle.util.encoders.Hex;
 import org.eclipse.jgit.api.ApplyResult;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.Hit;
+import org.eclipse.jgit.api.MigrateCommand;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
-import org.eclipse.jgit.lib.*;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.hitchain.contract.api.ContractApi;
-import org.hitchain.contract.api.PullRequestContractEthereumApi;
-import org.hitchain.contract.api.RepositoryContractEthereumApi;
-import org.hitchain.contract.ethereum.PullRequestContractEthereumService;
-import org.hitchain.contract.ethereum.RepositoryContractEthereumService;
 import org.hitchain.hit.api.ProjectInfoFile;
 import org.iff.infra.util.*;
 
@@ -73,6 +74,7 @@ public class HitHelper {
     public static final String TYPE_chain = "chain";
     public static final String TYPE_chainapi = "chainapi";
     public static final String TYPE_gas = "gas";
+    public static final String TYPE_contract = "contract";
     //
     public static final String TYPE_member = "member";
     public static final String TYPE_keypair = "keypair";
@@ -80,6 +82,7 @@ public class HitHelper {
     public static final String ACTION_add = "add";
     public static final String ACTION_remove = "remove";
     public static final String ACTION_set = "set";
+    public static final String ACTION_deploy = "deploy";
     //
     public static final String ACTION_renew = "renew";
 
@@ -160,7 +163,13 @@ public class HitHelper {
         }
     }
 
-    public static Tuple.Two<String, String, String> getByName(Map<String/*section*/, Map<String/*name*/, String/*value*/>> config, String section, String name) {
+    /**
+     * @param config
+     * @param section
+     * @param name
+     * @return Tuple.Two[String, String: value1, String: value2]
+     */
+    public static Tuple.Two<String, String/*value1*/, String/*value2*/> getByName(Map<String/*section*/, Map<String/*name*/, String/*value*/>> config, String section, String name) {
         if (config.isEmpty()) {
             return null;
         }
@@ -183,7 +192,7 @@ public class HitHelper {
             two.result(kv.get(NAME_default));
             return two;
         }
-        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main, TYPE_gas, TYPE_contract
             if (!kv.containsKey(name)) {
                 return null;
             }
@@ -223,7 +232,7 @@ public class HitHelper {
             kv.put(pri, value2);
             return true;
         }
-        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main, TYPE_gas, TYPE_contract
             if (NAME_default.equals(name)) {
                 kv.put(name, value1);
                 return true;
@@ -260,7 +269,7 @@ public class HitHelper {
             }
             return true;
         }
-        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main
+        {//TYPE_storage, TYPE_repository, TYPE_chain, TYPE_chainapi, TYPE_main, TYPE_gas, TYPE_contract
             kv.remove(name);
             if (name.equals(StringUtils.trim(kv.get(NAME_default)))) {
                 kv.put(NAME_default, "");
@@ -719,6 +728,68 @@ public class HitHelper {
         return true;
     }
 
+    public static void contractInfo(String name) {
+        if (name == null) {
+            hitConfigInfo(TYPE_contract);
+            return;
+        }
+        Tuple.Two<String, String, String> two = getByName(getHitConfig(), TYPE_contract, name);
+        if (two == null) {
+            System.out.println("Can not find the contract name: " + name);
+            return;
+        }
+        System.out.println("The information by contract's name: " + name);
+        System.out.println("contract :" + two.first());
+        System.out.println("default   name:" + two.result());
+    }
+
+    public static boolean contractAdd(String name, String address) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        if (StringUtils.isBlank(address)) {
+            System.out.println("Contract address must has value.");
+            return false;
+        }
+        addByName(getHitConfig(), TYPE_contract, name, address, null);
+        return true;
+    }
+
+    public static boolean contractDeploy(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        String address = null;
+        try {
+            address = Hit.deployContract().call();
+        } catch (Exception e) {
+        }
+        if (StringUtils.isBlank(address) || ContractApi.isError(address)) {
+            System.out.println("Can not deploy contract.");
+            return false;
+        }
+        addByName(getHitConfig(), TYPE_contract, name, address, null);
+        return true;
+    }
+
+    public static boolean contractRemove(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        return removeByName(getHitConfig(), TYPE_contract, name);
+    }
+
+    public static boolean contractSet(String name) {
+        if (!isValidName(name)) {
+            return false;
+        }
+        if (getByName(getHitConfig(), TYPE_contract, name) == null || !addByName(getHitConfig(), TYPE_contract, NAME_default, name, null)) {
+            System.out.println("Can not find the contract " + name + " config!");
+            return false;
+        }
+        return true;
+    }
+
     public static Map<String, Map<String, String>> getHitConfig() {
         return hitConfig == null ? hitConfig() : hitConfig;
     }
@@ -838,6 +909,12 @@ public class HitHelper {
         Tuple.Two<String, String, String> two = getDefaultValue(TYPE_gas);
         String gas = two == null ? null : two.first();
         return Long.valueOf(StringUtils.split(gas, ",")[3]);
+    }
+
+    public static String getContract() {
+        Tuple.Two<String, String, String> two = getDefaultValue(TYPE_contract);
+        String contract = two == null ? null : two.first();
+        return contract;
     }
 
     public static String getAccountPubKey() {
@@ -1000,64 +1077,64 @@ public class HitHelper {
         System.out.println(sb);
     }
 
-    public static boolean removeMember(File projectDir, String member, String memberAddressEcc, ProjectInfoFile projectInfoFile) {
-        ProjectInfoFile.TeamInfo teamInfo = null;
-        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
-            if (StringUtils.equals(ti.getMember(), member)) {
-                teamInfo = ti;
-                break;
-            }
-        }
-        if (teamInfo == null) {
-            System.out.println("No member found.");
-            return true;
-        }
-        projectInfoFile.getMembers().remove(teamInfo);
-        String result = EthereumHelper.removeTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc);
-        if (EthereumHelper.isError(result)) {
-            System.err.println("Remove member error:" + result);
-            System.exit(1);
-        }
-        if (!GitHelper.updateHitRepositoryProjectInfoFile(projectDir, projectInfoFile)) {
-            System.err.println("Update project info file error.");
-            System.exit(1);
-        }
-        System.out.println("Member has removed in the contract.");
-        return true;
-    }
+//    public static boolean removeMember(File projectDir, String member, String memberAddressEcc, ProjectInfoFile projectInfoFile) {
+//        ProjectInfoFile.TeamInfo teamInfo = null;
+//        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
+//            if (StringUtils.equals(ti.getMember(), member)) {
+//                teamInfo = ti;
+//                break;
+//            }
+//        }
+//        if (teamInfo == null) {
+//            System.out.println("No member found.");
+//            return true;
+//        }
+//        projectInfoFile.getMembers().remove(teamInfo);
+//        String result = EthereumHelper.removeTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc);
+//        if (EthereumHelper.isError(result)) {
+//            System.err.println("Remove member error:" + result);
+//            System.exit(1);
+//        }
+//        if (!GitHelper.updateHitRepositoryProjectInfoFile(projectDir, projectInfoFile)) {
+//            System.err.println("Update project info file error.");
+//            System.exit(1);
+//        }
+//        System.out.println("Member has removed in the contract.");
+//        return true;
+//    }
 
-    public static void addMember(File projectDir, String member, String memberPubKeyRsa, String memberAddressEcc, ProjectInfoFile projectInfoFile) {
-        if (StringUtils.isBlank(member) || StringUtils.isBlank(memberPubKeyRsa) || StringUtils.isBlank(memberAddressEcc)) {
-            System.err.println("Can't not execute command.");
-            System.exit(1);
-        }
-        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
-            if (StringUtils.equals(ti.getMember(), member) || StringUtils.equals(ti.getMemberAddressEcc(), memberAddressEcc)) {
-                System.out.println("Member is exists.");
-                return;
-            }
-        }
-        if (projectInfoFile.isPrivate()) {
-            projectInfoFile.addMemberPrivate(member, memberPubKeyRsa, memberAddressEcc, HitHelper.getRsaPriKeyWithPasswordInput());
-        } else {
-            projectInfoFile.addMemberPublic(member, memberPubKeyRsa, memberAddressEcc);
-        }
-        if (EthereumHelper.hasTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc)) {
-            System.out.println("Member is exists in the contract.");
-            return;
-        }
-        String result = EthereumHelper.addTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc);
-        if (EthereumHelper.isError(result)) {
-            System.err.println("Add member error:" + result);
-            System.exit(1);
-        }
-        if (!GitHelper.updateHitRepositoryProjectInfoFile(projectDir, projectInfoFile)) {
-            System.err.println("Update project info file error.");
-            System.exit(1);
-        }
-        System.out.println("Member has added in the contract.");
-        return;
-    }
+//    public static void addMember(File projectDir, String member, String memberPubKeyRsa, String memberAddressEcc, ProjectInfoFile projectInfoFile) {
+//        if (StringUtils.isBlank(member) || StringUtils.isBlank(memberPubKeyRsa) || StringUtils.isBlank(memberAddressEcc)) {
+//            System.err.println("Can't not execute command.");
+//            System.exit(1);
+//        }
+//        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
+//            if (StringUtils.equals(ti.getMember(), member) || StringUtils.equals(ti.getMemberAddressEcc(), memberAddressEcc)) {
+//                System.out.println("Member is exists.");
+//                return;
+//            }
+//        }
+//        if (projectInfoFile.isPrivate()) {
+//            projectInfoFile.addMemberPrivate(member, memberPubKeyRsa, memberAddressEcc, HitHelper.getRsaPriKeyWithPasswordInput());
+//        } else {
+//            projectInfoFile.addMemberPublic(member, memberPubKeyRsa, memberAddressEcc);
+//        }
+//        if (EthereumHelper.hasTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc)) {
+//            System.out.println("Member is exists in the contract.");
+//            return;
+//        }
+//        String result = EthereumHelper.addTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc);
+//        if (EthereumHelper.isError(result)) {
+//            System.err.println("Add member error:" + result);
+//            System.exit(1);
+//        }
+//        if (!GitHelper.updateHitRepositoryProjectInfoFile(projectDir, projectInfoFile)) {
+//            System.err.println("Update project info file error.");
+//            System.exit(1);
+//        }
+//        System.out.println("Member has added in the contract.");
+//        return;
+//    }
 
     public static ProjectInfoFile getProjectInfoFile(File projectDir) {
         ProjectInfoFile projectInfoFile = null;
@@ -1115,54 +1192,33 @@ public class HitHelper {
         System.out.println(sb);
     }
 
-    //
-
-    public static String enablePullRequest(File gitDir, boolean force) {
-        ProjectInfoFile projectInfoFile = HitHelper.getProjectInfoFile(gitDir);
-        PullRequestContractEthereumApi api = PullRequestContractEthereumService.getApi();
-        RepositoryContractEthereumApi repoApi = RepositoryContractEthereumService.getApi();
-        String fromAddress = HitHelper.getAccountAddress();
-        String repoContractAddress = projectInfoFile.getRepoAddress();
-        String contractAddress = repoApi.readPullRequestAddress(fromAddress, repoContractAddress);//maybe 0x00...000
-
-        if (!StringUtils.equalsIgnoreCase(projectInfoFile.getOwnerAddressEcc(), HitHelper.getAccountAddress())) {
-            if (!StringUtils.equalsIgnoreCase(repoApi.readDelegator(fromAddress, repoContractAddress), HitHelper.getAccountAddress())) {
-                System.err.println("Only repository owner or delegator can enable pull request!");
-                return null;
+    public static String createRepository(File file, String repositoryName, boolean autoRename) {
+        try {
+            if (StringUtils.isBlank(repositoryName)) {
+                if (file != null) {
+                    repositoryName = file.getParentFile().getName();
+                }
+                if (StringUtils.isBlank(repositoryName)) {
+                    return null;
+                }
             }
-        }
-        // check is has pull request.
-        if (ContractApi.isValidAddress(contractAddress)) {
-            if (force == false) {
-                System.err.println("This repository has enabled pull request, if you want to change pull request address add -f options!");
-                return null;
+            String repositoryAddress = Hit.createRepository().name(repositoryName).autoRename(autoRename).call();
+            String hitUri = "hit://" + repositoryAddress + ".git";
+            if (file == null) {
+                return hitUri;
             }
+            Hit hit = new Hit(new FileRepository(file), true);
+            hit.storedConfig().set("remote", "origin", "url", hitUri).call();
+            IOUtils.closeQuietly(hit);
+            System.out.println("Update remote origin url to " + hitUri);
+            GitHelper.onInitHitRepository(file);
+            return hitUri;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-        // deploy the pull request contract.
-        String result = api.deployContract(HitHelper.getAccountPriKeyWithPasswordInput(), HitHelper.getGasDeploy(), HitHelper.getGasDeployGwei());
-        if (ContractApi.isError(result)) {
-            System.out.println("Deploy pull request contract failed, error: " + result + "!");
-            return null;
-        }
-        contractAddress = result;
-        System.out.println("Pull request contract deploy success, contract address: " + contractAddress);
-        String result2 = repoApi.writeUpdatePullRequestAddress(contractAddress, HitHelper.getAccountPriKeyWithPasswordInput(), repoContractAddress, HitHelper.getGasWrite(), HitHelper.getGasWriteGwei());
-        if (ContractApi.isError(result2)) {
-            System.out.println("Update pull request contract failed, error: " + result2 + "!");
-        } else {
-            System.out.println("Pull request enable success.");
-        }
-        return contractAddress;
     }
 
     public static String createPullRequestCmd(File gitDir, String startBranch, String endBranch, String comment) {
-        ProjectInfoFile projectInfoFile = HitHelper.getProjectInfoFile(gitDir);
-        PullRequestContractEthereumApi api = PullRequestContractEthereumService.getApi();
-        RepositoryContractEthereumApi repoApi = RepositoryContractEthereumService.getApi();
-        String fromAddress = HitHelper.getAccountAddress();
-        String repoContractAddress = projectInfoFile.getRepoAddress();
-        String contractAddress = repoApi.readPullRequestAddress(fromAddress, repoContractAddress);//maybe 0x00...000
-
         // setting system property for transport.
         System.setProperty("GIT_CMD", "pullRequest");
         // comment is required.
@@ -1171,11 +1227,6 @@ public class HitHelper {
             return null;
         }
         // check if the repository has enabled the pull request.
-        String pullRequestAddress = repoApi.readPullRequestAddress(fromAddress, repoContractAddress);
-        if (StringUtils.isBlank(pullRequestAddress)) {
-            System.err.println("The repository is not enable the pull request!");
-            return null;
-        }
         Tuple.Two<Object, String, PatchHelper.PatchSummaryInfo> two = HitHelper.createPullRequest(gitDir, startBranch, endBranch, comment);
         String pullRequest = two.first();
         if (StringUtils.isBlank(pullRequest)) {
@@ -1187,9 +1238,11 @@ public class HitHelper {
             System.err.println("Can not create pull request info!");
             return null;
         }
-        //
-        String result = api.writeAddPullRequest(prInfo, HitHelper.getAccountPriKeyWithPasswordInput(), pullRequestAddress, HitHelper.getGasWrite(), HitHelper.getGasWriteGwei());
-        return result;
+        try (Hit hit = new Hit(new FileRepository(gitDir), true)) {
+            return hit.contract().addPullRequest(prInfo);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static Tuple.Two<Object, String, PatchHelper.PatchSummaryInfo> createPullRequest(File gitDir, String startBranch, String endBranch, String comment) {
@@ -1208,32 +1261,39 @@ public class HitHelper {
             System.out.println("PullRequest: http://" + HitHelper.getStorage() + ":8080/ipfs/" + pullRequestHash);
             two = new Tuple.Two<>(pullRequestHash, patch);
         }
-        {// push repository
-            try (Repository repo = new FileRepository(gitDir)) {
-                new Git(repo).push().call();
-            } catch (Exception e) {
-                throw new RuntimeException("HitHelper can not push the repository!", e);
-            }
+        // push repository
+        try (Hit hit = new Hit(new FileRepository(gitDir), true)) {
+            hit.push().call();
+        } catch (Exception e) {
+            throw new RuntimeException("HitHelper can not push the repository!", e);
         }
         return two;
     }
 
+    /**
+     * create pull request info and update to ipfs and return hash.
+     *
+     * @param gitDir
+     * @param startBranch
+     * @param endBranch
+     * @param comment
+     * @param twos
+     * @return
+     */
     public static String createPullRequestInfo(File gitDir, String startBranch, String endBranch, String comment, Tuple.Two<Object, String, PatchHelper.PatchSummaryInfo>[] twos) {
         List<Object> infos = new ArrayList<>();
         String url = null, author = null;
-        ArrayList<Object> patches = new ArrayList<>();
-        try (Repository repo = new FileRepository(gitDir)) {
-            Config config = repo.getConfig();
-            String name = config.getString("user", null, "name");
-            String email = config.getString("user", null, "email");
+        try (Hit hit = new Hit(new FileRepository(gitDir), true)) {
+            String name = hit.storedConfig().get("user", null, "name").call();
+            String email = hit.storedConfig().get("user", null, "email").call();
             if (name == null || email == null) {
                 author = "unknown";
             } else {
                 author = name + " <" + email + ">";
             }
-            url = config.getString("remote", "origin", "url");
+            url = hit.storedConfig().get("remote", "origin", "url").call();
         } catch (Exception e) {
-            return null;
+            throw new RuntimeException("HitHelper can not push the repository!", e);
         }
         for (Tuple.Two<Object, String, PatchHelper.PatchSummaryInfo> two : twos) {
             Map<String, Object> format = PatchHelper.format(two.second(), url, author, getAccountAddress(), getRsaPubKey());
@@ -1313,7 +1373,7 @@ public class HitHelper {
         return true;
     }
 
-    public static String migrateWithPullRequest(String gitUrl) {
+    public static String migrateWithPullRequest(String gitUrl, String repositoryName) {
         String workDir = System.getProperty("git_work_tree");
         System.out.println("Start to clone repository " + gitUrl + " ...");
         try (Repository repo = Git.cloneRepository()
@@ -1321,21 +1381,22 @@ public class HitHelper {
                 .setURI(gitUrl)
                 .setProgressMonitor(new TextProgressMonitor())
                 .call().getRepository()) {
+            System.out.println("Check repository name...");
+            repositoryName = StringUtils.isBlank(repositoryName) ? repo.getDirectory().getParentFile().getName() : repositoryName;
+            if (Hit.util().readId(repositoryName) > 0) {
+                throw new Exception("Migrate repository name " + repositoryName + " exists, you should provide a new name for migrate.");
+            }
             System.out.println("Clone repository " + gitUrl + " success.");
             Git git = new Git(repo);
-            StoredConfig config = repo.getConfig();
-            config.load();
-            config.setString("remote", "origin", "url", "hit://" + repo.getDirectory().getName() + ".git");
-            config.save();
             System.out.println("Start to fetch pull request...");
             List<PatchHelper.PatchSummaryInfo> summaryInfos = fetchPullRequest2(repo.getDirectory(), gitUrl);
             System.out.println("Fetch pull request success.");
+            System.out.println("Start to add repository...");
+            HitHelper.createRepository(repo.getDirectory(), repositoryName, false);
             System.out.println("Start to push repository to hit...");
             git.push().call();
+            Hit hit = new Hit(repo);
             System.out.println("Push repository to hit success.");
-            System.out.println("Start to enable pull request...");
-            String contractAddress = enablePullRequest(repo.getDirectory(), false);
-            System.out.println("Enable pull request success.");
             System.out.println("Start to add pull request...");
             File pullRequestFetch = new File(repo.getDirectory(), "pullrequest_fetch");
             {//
@@ -1351,14 +1412,14 @@ public class HitHelper {
                 }
                 String url = null, author = null;
                 {
-                    String name = config.getString("user", null, "name");
-                    String email = config.getString("user", null, "email");
+                    String name = hit.storedConfig().get("user", null, "name").call();
+                    String email = hit.storedConfig().get("user", null, "email").call();
                     if (name == null || email == null) {
                         author = "unknown";
                     } else {
                         author = name + " <" + email + ">";
                     }
-                    url = config.getString("remote", "origin", "url");
+                    url = hit.storedConfig().get("remote", "origin", "url").call();
                 }
                 for (PatchHelper.PatchSummaryInfo psi : summaryInfos) {
                     Map<String, Object> format = PatchHelper.format(psi, url, author, getAccountAddress(), getRsaPubKey());
@@ -1371,9 +1432,10 @@ public class HitHelper {
                 {// upload pull request info
                     prInfoHash = GitHelper.writeFileToIpfs(ByteHelper.utf8(prInfo), "pullRequestInfo.json");
                     System.out.println("PullRequestInfo: http://" + HitHelper.getStorage() + ":8080/ipfs/" + prInfoHash);
-                    String writeAddPullRequest = PullRequestContractEthereumService.getApi().writeAddPullRequest(prInfoHash, getAccountPriKeyWithPasswordInput(), contractAddress, getGasWrite(), getGasWriteGwei());
-                    if (ContractApi.isError(writeAddPullRequest)) {
-                        System.err.println("Add pull request faild, error: " + writeAddPullRequest);
+                    String result = hit.contract().addPullRequest(prInfoHash);
+                    //String writeAddPullRequest = PullRequestContractEthereumService.getApi().writeAddPullRequest(prInfoHash, getAccountPriKeyWithPasswordInput(), contractAddress, getGasWrite(), getGasWriteGwei());
+                    if (ContractApi.isError(result)) {
+                        System.err.println("Add pull request faild, error: " + result);
                         return null;
                     }
                 }
@@ -1413,7 +1475,7 @@ public class HitHelper {
         String repoName = StringUtils.remove(paths.get(0), ".git");
         String owner = paths.get(1);
         // pull url sample: https://api.github.com/repos/ethereum/ethereumj/pulls
-        String pullUrl = FCS.get("https://api.github.com/repos/{owner}/{repoName}/pulls?per_page=100", owner, repoName).toString();
+        String pullUrl = FCS.get("https://api.github.com/repos/{owner}/{repoName}/pulls?per_page=10", owner, repoName).toString();
         String pullsJson = httpGet2(pullUrl, "Try fetch pull request for {times} times, url {url}.");
         List<Map<String, Object>> pulls = GsonHelper.toJsonList(pullsJson);
         for (Map<String, Object> pull : pulls) {
@@ -1435,7 +1497,10 @@ public class HitHelper {
             //
             String commitsJson = httpGet2(commitsUrl, "Try fetch pull request commits for {times} times, url {url}.");
             List<Map<String, Object>> commits = GsonHelper.toJsonList(commitsJson);
-            int commitIndex = 0, commitTotal = commits.size();
+            if (commits == null) {
+                System.out.println("commits is null: " + commitsJson);
+            }
+            int commitIndex = 0, commitTotal = commits == null ? 0 : commits.size();
             PatchHelper.PatchSummaryInfo summaryInfo = new PatchHelper.PatchSummaryInfo();
             {
                 summaryInfos.add(summaryInfo);
@@ -1689,6 +1754,7 @@ public class HitHelper {
 
     private static String httpGet2(String requestUrl, String tryMessage) {
         String content = "";
+        String token = System.getProperty(MigrateCommand.PROP_TOKEN, "");
         for (int i = 0; i < 5; i++) {
             if (tryMessage != null && i > 0) {
                 System.out.println(FCS.get(tryMessage, i, requestUrl));
@@ -1703,6 +1769,9 @@ public class HitHelper {
                     connection.setRequestMethod("GET");
                     connection.setRequestProperty("charset", "UTF-8");
                     connection.setRequestProperty("accept", "*/*");
+                    if (StringUtils.isNotBlank(token)) {
+                        connection.setRequestProperty("Authorization", "token " + token);
+                    }
                     connection.setConnectTimeout(30 * 1000);
                     connection.setReadTimeout(60 * 1000);
                     connection.connect();

@@ -142,7 +142,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
     public void close() {
         // No explicit connections are maintained.
         updateHitFile();
-        updateOriginAfterInitPush();
+        //updateOriginAfterInitPush();
         Map<String/* filename */, Two<Object, String/* ipfs hash */, String/* sha1 */>> uploadedGitFileIndex = hit.getUploadedGitFileIndex();
         boolean isPullRequest = StringUtils.equals(System.getProperty("GIT_CMD"), "pullRequest");
         if (uploadedGitFileIndex.isEmpty() && !isPullRequest) {
@@ -161,7 +161,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
                 }
                 try {
                     hit.put(entry.getKey(), FileUtils.readFileToByteArray(entry.getValue()));
-                    System.out.println("Upload missing objects:" + entry.getKey());
+                    //System.out.println("Upload missing objects:" + entry.getKey());
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }

@@ -9,7 +9,9 @@
 package org.hitchain.hit.util;
 
 import org.hitchain.contract.api.ContractApi;
+import org.hitchain.contract.api.HitRepositoryContractEthereumApi;
 import org.hitchain.contract.api.RepositoryContractEthereumApi;
+import org.hitchain.contract.ethereum.HitRepositoryContractEthereumService;
 import org.hitchain.contract.ethereum.RepositoryContractEthereumService;
 
 /**
@@ -43,55 +45,55 @@ import org.hitchain.contract.ethereum.RepositoryContractEthereumService;
  */
 public class EthereumHelper {
 
-    public static RepositoryContractEthereumApi getApi() {
-        return RepositoryContractEthereumService.getApi();
-    }
+//    public static HitRepositoryContractEthereumApi getApi() {
+//        return HitRepositoryContractEthereumService.getApi();
+//    }
 
-    public static String createContractForProject(String urlBase, String ownerAddressEcc, String projectName) {
-        ///====create
-        System.out.println("Contract is deploying...please wait for seconds...");
-        String address = getApi().deployContract(HitHelper.getAccountPriKeyWithPasswordInput(), HitHelper.getGasDeploy(), HitHelper.getGasDeployGwei());
-        if (isError(address)) {
-            return null;
-        }
-        //====init
-        System.out.println("Contract " + address + " is initializing...please wait for seconds...");
-        String init = getApi().writeInit(ownerAddressEcc, projectName, HitHelper.getAccountPriKeyWithPasswordInput(), address, 500000, 10);
-        if (!isError(init)) {
-            return address;
-        }
-        return null;
-    }
+//    public static String createContractForProject(String urlBase, String ownerAddressEcc, String projectName) {
+//        ///====create
+//        System.out.println("Contract is deploying...please wait for seconds...");
+//        String address = getApi().deployContract(HitHelper.getAccountPriKeyWithPasswordInput(), HitHelper.getGasDeploy(), HitHelper.getGasDeployGwei());
+//        if (isError(address)) {
+//            return null;
+//        }
+//        //====init
+//        System.out.println("Contract " + address + " is initializing...please wait for seconds...");
+//        String init = getApi().writeInit(ownerAddressEcc, projectName, HitHelper.getAccountPriKeyWithPasswordInput(), address, 500000, 10);
+//        if (!isError(init)) {
+//            return address;
+//        }
+//        return null;
+//    }
 
-    public static void updateProjectAddress(String urlBase, String contractAddress, String ownerPriKeyEcc, String newProjectHash) {
-        String oldRepositoryAddress = getApi().readRepositoryAddress(HitHelper.getAccountAddress(), contractAddress);
-        String result = getApi().writeUpdateRepositoryAddress(oldRepositoryAddress, newProjectHash, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, 500000, 10);
-        if (!isError(result)) {
-            return;
-        }
-        throw new RuntimeException(result);
+//    public static void updateProjectAddress(String urlBase, String contractAddress, String ownerPriKeyEcc, String newProjectHash) {
+//        String oldRepositoryAddress = getApi().readRepositoryAddress(HitHelper.getAccountAddress(), contractAddress);
+//        String result = getApi().writeUpdateRepositoryAddress(oldRepositoryAddress, newProjectHash, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, 500000, 10);
+//        if (!isError(result)) {
+//            return;
+//        }
+//        throw new RuntimeException(result);
+//
+//    }
 
-    }
+//    public static String getProjectAddress(String urlBase, String contractAddress) {
+//        return getApi().readRepositoryAddress(HitHelper.getAccountAddress(), contractAddress);
+//    }
+//
+//    public static boolean hasTeamMember(String urlBase, String contractAddress, String memberAddress) {
+//        return getApi().readTeamMember(HitHelper.getAccountAddress(), contractAddress, memberAddress);
+//    }
+//
+//    public static String addTeamMember(String urlBase, String contractAddress, String memberAddress) {
+//        return getApi().writeAddTeamMember(memberAddress, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, 500000, 10);
+//    }
+//
+//    public static String removeTeamMember(String urlBase, String contractAddress, String memberAddress) {
+//        return getApi().writeRemoveTeamMember(memberAddress, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, 500000, 10);
+//    }
 
-    public static String getProjectAddress(String urlBase, String contractAddress) {
-        return getApi().readRepositoryAddress(HitHelper.getAccountAddress(), contractAddress);
-    }
-
-    public static boolean hasTeamMember(String urlBase, String contractAddress, String memberAddress) {
-        return getApi().readTeamMember(HitHelper.getAccountAddress(), contractAddress, memberAddress);
-    }
-
-    public static String addTeamMember(String urlBase, String contractAddress, String memberAddress) {
-        return getApi().writeAddTeamMember(memberAddress, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, 500000, 10);
-    }
-
-    public static String removeTeamMember(String urlBase, String contractAddress, String memberAddress) {
-        return getApi().writeRemoveTeamMember(memberAddress, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress, 500000, 10);
-    }
-
-    public static boolean isError(String result) {
-        return ContractApi.isError(result);
-    }
+//    public static boolean isError(String result) {
+//        return ContractApi.isError(result);
+//    }
 
 //    /**
 //     * 绕过验证
