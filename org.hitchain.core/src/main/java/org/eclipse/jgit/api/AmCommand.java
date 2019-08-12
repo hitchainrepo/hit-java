@@ -8,15 +8,8 @@
 package org.eclipse.jgit.api;
 
 import org.apache.commons.lang3.StringUtils;
-import org.hitchain.contract.api.PullRequestContractEthereumApi;
-import org.hitchain.contract.api.RepositoryContractEthereumApi;
-import org.hitchain.contract.ethereum.PullRequestContractEthereumService;
-import org.hitchain.contract.ethereum.RepositoryContractEthereumService;
-import org.hitchain.hit.api.ProjectInfoFile;
 import org.hitchain.hit.util.HitHelper;
-import org.web3j.utils.Numeric;
 
-import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -42,36 +35,30 @@ public class AmCommand implements Callable<Hit> {
 
     @Override
     public Hit call() throws Exception {
-        ProjectInfoFile projectInfoFile = hit().projectInfoFile();
-
-        PullRequestContractEthereumApi api = PullRequestContractEthereumService.getApi();
-        RepositoryContractEthereumApi repoApi = RepositoryContractEthereumService.getApi();
-        String fromAddress = HitHelper.getAccountAddress();
-        String repoContractAddress = projectInfoFile.getRepoAddress();
-        String contractAddress = repoApi.readPullRequestAddress(fromAddress, repoContractAddress);//maybe 0x00...000
-        boolean hasPrContract = StringUtils.isNotBlank(contractAddress) && contractAddress.startsWith("0x") && !Numeric.toBigInt(contractAddress).equals(BigInteger.ZERO);
-        contractAddress = hasPrContract ? contractAddress : null;
-
+        HitRepositoryContractCommand contract = hit().contract();
         Map<String, Object> prForMerge = null;
-        List<Map<String, Object>> prs = PullRequestContractEthereumService.listAuthedPRs(fromAddress, contractAddress);
-        for (Map<String, Object> pr : prs) {
-            if (StringUtils.equals(patchId(), (String) pr.get("id"))) {
-                prForMerge = pr;
-                break;
-            }
-        }
-        if (prForMerge == null) {
-            prs = PullRequestContractEthereumService.listCommunityPRs(fromAddress, contractAddress);
+
+        List<Map<String, Object>> prs = contract.listAuthoredPullRequests();
+        {// find the pull request by id for apply patch
             for (Map<String, Object> pr : prs) {
                 if (StringUtils.equals(patchId(), (String) pr.get("id"))) {
                     prForMerge = pr;
                     break;
                 }
             }
-        }
-        if (prForMerge == null) {
-            System.err.println("Pull request for id:" + patchId() + " not found!");
-            return hit();
+            if (prForMerge == null) {
+                prs = contract.listCommunityPullRequests();
+                for (Map<String, Object> pr : prs) {
+                    if (StringUtils.equals(patchId(), (String) pr.get("id"))) {
+                        prForMerge = pr;
+                        break;
+                    }
+                }
+            }
+            if (prForMerge == null) {
+                System.err.println("Pull request for id:" + patchId() + " not found!");
+                return hit();
+            }
         }
         boolean result = HitHelper.pullRequestMerge(hit().getRepository().getDirectory(), prForMerge, ignoreSpaceChange, ignoreWhitespace, forceMergeLine, noCommit);
         if (Boolean.TRUE.equals(result)) {
