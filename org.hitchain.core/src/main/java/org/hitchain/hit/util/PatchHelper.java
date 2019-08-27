@@ -128,6 +128,61 @@ public class PatchHelper {
         return list;
     }
 
+    /**
+     * parse diff content and return PatchInfo{patch: diff, files, insertions, deletions, summary}
+     * <pre>
+     * Sample data:
+     * https://gitee.com/jfinal/jfinal/pulls/40.diff
+     * https://gitee.com/jfinal/jfinal/pulls/40.patch
+     * https://gitee.com/jfinal/jfinal/pulls/40/commits
+     * </pre>
+     *
+     * @param in
+     * @return
+     */
+    public static PatchInfo parseDiff(InputStream in) {
+        try {
+            String content = IOUtils.toString(in, "UTF-8");
+            String[] split = StringUtils.split(content, '\n');
+            StringBuilder diff = new StringBuilder();
+            PatchInfo pi = new PatchInfo();
+            int files = 0;
+            int insertions = 0;
+            int deletions = 0;
+            for (String s : split) {
+                if (s.startsWith("diff --git ") || s.startsWith("diff --cc ") || s.startsWith("diff --combined ")) {
+                    diff.append(s).append('\n');
+                    files += 1;
+                    continue;
+                }
+                if (s.equals("-- ")) {//jgit
+                    continue;
+                }
+                if (s.equals("--")) {//libgit2
+                    continue;
+                }
+                if (s.startsWith("+")) {
+                    insertions += 1;
+                }
+                if (s.startsWith("-")) {
+                    deletions += 1;
+                }
+                diff.append(s).append('\n');
+            }
+            {
+                //pi.from(DateUtils.parseDate("Mon Sep 17 00:00:00 2001", new String[]{"EEE MMM dd HH:mm:ss yyyy", "EEE, dd MMM yyyy HH:mm:ss Z", "yyyy-MM-dd'T'HH:mm:ssXXX"}));
+                pi.patch(diff.toString());
+                pi.files(files);
+                pi.insertions(insertions);
+                pi.deletions(deletions);
+                pi.summary(files + " files changed, " + insertions + " insertions(+), " + deletions + " deletions(-)");//TODO missing change details.
+            }
+            return pi;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static PatchSummaryInfo createPatch(File gitDir, String startRev, String endRev, String comment) {
         PatchSummaryInfo summary = new PatchSummaryInfo();
         try (Repository repo = new FileRepository(gitDir)) {
@@ -146,13 +201,13 @@ public class PatchHelper {
             AtomicInteger count = new AtomicInteger(0);
             int total = commits.size();
             {
-                summary.startRevision = startRev;
-                summary.endRevision = endRev;
-                summary.startCommit = base.getName();
-                summary.endCommit = commits.get(commits.size() - 1).getName();
-                summary.totalCommit = total;
-                summary.message = comment;
-                summary.date = new Date();
+                summary.startRevision(startRev)
+                        .endRevision(endRev)
+                        .startCommit(base.getName())
+                        .endCommit(commits.get(commits.size() - 1).getName())
+                        .totalCommit(total)
+                        .message(comment)
+                        .date(new Date());
             }
             for (RevCommit rev : commits) {
                 PatchFormatter patch = new PatchFormatter(baos);
@@ -160,7 +215,7 @@ public class PatchHelper {
                 patch.format(base.getTree(), rev.getTree());
                 PatchInfo patchInfo = patch.writePatch(base, rev, count.incrementAndGet(), total);
                 {
-                    summary.patchs.add(patchInfo);
+                    summary.patchs().add(patchInfo);
                 }
                 base = rev;
             }
@@ -197,11 +252,11 @@ public class PatchHelper {
         for (PatchInfo pi : info.patchs) {
             Map<String, Object> tmp = new LinkedHashMap<>();
             MapHelper.fillMap(tmp,
-                    "id", pi.commit,
+                    "id", pi.endCommit(),
                     "commit_index", String.valueOf(pi.commitIndex),
                     "total_commit", String.valueOf(pi.commitTotal),
-                    "start_commit", pi.base,
-                    "end_commit", pi.commit,
+                    "start_commit", pi.startCommit(),
+                    "end_commit", pi.endCommit(),
                     "short_message", pi.shortMsg,
                     "message", pi.msg,
                     "author", pi.author,
@@ -341,21 +396,21 @@ public class PatchHelper {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            PatchInfo info = new PatchInfo();
-            {
-                info.commitIndex = index;
-                info.commitTotal = totalCount;
-                info.base = startCommit.getName();
-                info.commit = endCommit.getName();
-                info.shortMsg = subject;
-                info.msg = msg;
-                info.author = author.getName() + " <" + author.getEmailAddress() + ">";
-                info.files = files;
-                info.insertions = insertions;
-                info.deletions = deletions;
-                info.summary = StringUtils.join(changeDetail, "\n") + "\n " + files + " files changed, " + insertions + " insertions(+), " + deletions + " deletions(-)";
-                info.patch = patchContent;
-            }
+            PatchInfo info = new PatchInfo()
+                    .commitIndex(index)
+                    .commitTotal(totalCount)
+                    .startCommit(startCommit.getName())
+                    .endCommit(endCommit.getName())
+                    .shortMsg(subject)
+                    .msg(msg)
+                    .author(author.getName())
+                    .email(author.getEmailAddress())
+                    .date(author.getWhen())
+                    .files(files)
+                    .insertions(insertions)
+                    .deletions(deletions)
+                    .summary(StringUtils.join(changeDetail, "\n") + "\n " + files + " files changed, " + insertions + " insertions(+), " + deletions + " deletions(-)")
+                    .patch(patchContent);
             return info;
         }
 
@@ -367,198 +422,290 @@ public class PatchHelper {
         }
     }
 
+    /**
+     * Patch information description.
+     */
     public static class PatchInfo implements Serializable {
-        int commitIndex;
-        int commitTotal;
-        String base;
-        String commit;
-        String shortMsg;
-        String msg;
-        String author;
-        int files;
-        int insertions;
-        int deletions;
-        String summary;
-        String patch;
+        /*Subject: [PATCH commitIndex/commitTotal] shortMsg*/
+        protected int commitIndex;
+        /*Subject: [PATCH commitIndex/commitTotal] shortMsg*/
+        protected int commitTotal;
+        /*User for the merge, to checkout the commit*/
+        protected String startCommit;
+        /*From b9ec6700e4e0c41849104e9be90c50ad5e731b99 Mon Sep 17 00:00:00 2001*/
+        protected String endCommit;
+        /*Subject: [PATCH commitIndex/commitTotal] shortMsg*/
+        protected String shortMsg;
+        /*the full message append to the Subject with new line*/
+        protected String msg;
+        /*From: author <author@163.com>*/
+        protected String author;
+        /*From: author <email@163.com>*/
+        protected String email;
+        /*Date: Thu, 25 Oct 2018 14:59:23 +0800*/
+        protected Date date;
+        /*3 files changed, 57 insertions(+), 4 deletions(-)*/
+        protected int files;
+        /*3 files changed, 57 insertions(+), 4 deletions(-)*/
+        protected int insertions;
+        /*3 files changed, 57 insertions(+), 4 deletions(-)*/
+        protected int deletions;
+        /*files list, change summary and create mode*/
+        protected String summary;
+        /*full path content*/
+        protected String patch;
 
-        public int getCommitIndex() {
+        public String genPatch(String diff) {
+            String patchInfo = "" +//
+                    "From {commitName} Mon Sep 17 00:00:00 2001\n" +//Fixed timestamp to match output of C Git's format-patch
+                    "From: {authorName} <{authorEmail}>\n" +//
+                    "Date: {date}\n" +//
+                    "Subject: [PATCH {index}/{total}] {subject}\n" +//
+                    "\n" +//
+                    "{msg}\n" +//
+                    "---\n" +//
+                    "{changeDetail}\n" +//
+                    " {files} files changed, {insertions} insertions(+), {deletions} deletions(-)\n\n" +//
+                    "{diff}\n" +//
+                    "-- \n";
+            return FCS.get(patchInfo,
+                    endCommit(),
+                    author(),
+                    email(),
+                    new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US).format(date()),
+                    commitIndex(),
+                    commitTotal(),
+                    shortMsg(),
+                    msg(),
+                    summary(),
+                    files(),
+                    insertions(),
+                    deletions(),
+                    diff
+            ).toString();
+        }
+
+        public String email() {
+            return email;
+        }
+
+        public PatchInfo email(String email) {
+            this.email = email;
+            return this;
+        }
+
+        public Date date() {
+            return date;
+        }
+
+        public PatchInfo date(Date date) {
+            this.date = date;
+            return this;
+        }
+
+        public int commitIndex() {
             return commitIndex;
         }
 
-        public void setCommitIndex(int commitIndex) {
+        public PatchInfo commitIndex(int commitIndex) {
             this.commitIndex = commitIndex;
+            return this;
         }
 
-        public int getCommitTotal() {
+        public int commitTotal() {
             return commitTotal;
         }
 
-        public void setCommitTotal(int commitTotal) {
+        public PatchInfo commitTotal(int commitTotal) {
             this.commitTotal = commitTotal;
+            return this;
         }
 
-        public String getBase() {
-            return base;
+        public String startCommit() {
+            return startCommit;
         }
 
-        public void setBase(String base) {
-            this.base = base;
+        public PatchInfo startCommit(String startCommit) {
+            this.startCommit = startCommit;
+            return this;
         }
 
-        public String getCommit() {
-            return commit;
+        public String endCommit() {
+            return endCommit;
         }
 
-        public void setCommit(String commit) {
-            this.commit = commit;
+        public PatchInfo endCommit(String endCommit) {
+            this.endCommit = endCommit;
+            return this;
         }
 
-        public String getShortMsg() {
+        public String shortMsg() {
             return shortMsg;
         }
 
-        public void setShortMsg(String shortMsg) {
+        public PatchInfo shortMsg(String shortMsg) {
             this.shortMsg = shortMsg;
+            return this;
         }
 
-        public String getMsg() {
+        public String msg() {
             return msg;
         }
 
-        public void setMsg(String msg) {
+        public PatchInfo msg(String msg) {
             this.msg = msg;
+            return this;
         }
 
-        public String getAuthor() {
+        public String author() {
             return author;
         }
 
-        public void setAuthor(String author) {
+        public PatchInfo author(String author) {
             this.author = author;
+            return this;
         }
 
-        public int getFiles() {
+        public int files() {
             return files;
         }
 
-        public void setFiles(int files) {
+        public PatchInfo files(int files) {
             this.files = files;
+            return this;
         }
 
-        public int getInsertions() {
+        public int insertions() {
             return insertions;
         }
 
-        public void setInsertions(int insertions) {
+        public PatchInfo insertions(int insertions) {
             this.insertions = insertions;
+            return this;
         }
 
-        public int getDeletions() {
+        public int deletions() {
             return deletions;
         }
 
-        public void setDeletions(int deletions) {
+        public PatchInfo deletions(int deletions) {
             this.deletions = deletions;
+            return this;
         }
 
-        public String getSummary() {
+        public String summary() {
             return summary;
         }
 
-        public void setSummary(String summary) {
+        public PatchInfo summary(String summary) {
             this.summary = summary;
+            return this;
         }
 
-        public String getPatch() {
+        public String patch() {
             return patch;
         }
 
-        public void setPatch(String patch) {
+        public PatchInfo patch(String patch) {
             this.patch = patch;
+            return this;
+        }
+
+        public String toString() {
+            return patch();
         }
     }
 
     public static class PatchSummaryInfo implements Serializable {
-        String startRevision;
-        String endRevision;
-        String startCommit;
-        String endCommit;
-        int totalCommit;
-        String message;
-        Date date;
-        String patch;
-        List<PatchInfo> patchs = new ArrayList<>();
+        protected String startRevision;
+        protected String endRevision;
+        protected String startCommit;
+        protected String endCommit;
+        protected int totalCommit;
+        protected String message;
+        protected Date date;
+        protected String patch;
+        protected List<PatchInfo> patchs;
 
-        public String getStartRevision() {
+        public String startRevision() {
             return startRevision;
         }
 
-        public void setStartRevision(String startRevision) {
+        public PatchSummaryInfo startRevision(String startRevision) {
             this.startRevision = startRevision;
+            return this;
         }
 
-        public String getEndRevision() {
+        public String endRevision() {
             return endRevision;
         }
 
-        public void setEndRevision(String endRevision) {
+        public PatchSummaryInfo endRevision(String endRevision) {
             this.endRevision = endRevision;
+            return this;
         }
 
-        public String getStartCommit() {
+        public String startCommit() {
             return startCommit;
         }
 
-        public void setStartCommit(String startCommit) {
+        public PatchSummaryInfo startCommit(String startCommit) {
             this.startCommit = startCommit;
+            return this;
         }
 
-        public String getEndCommit() {
+        public String endCommit() {
             return endCommit;
         }
 
-        public void setEndCommit(String endCommit) {
+        public PatchSummaryInfo endCommit(String endCommit) {
             this.endCommit = endCommit;
+            return this;
         }
 
-        public int getTotalCommit() {
+        public int totalCommit() {
             return totalCommit;
         }
 
-        public void setTotalCommit(int totalCommit) {
+        public PatchSummaryInfo totalCommit(int totalCommit) {
             this.totalCommit = totalCommit;
+            return this;
         }
 
-        public String getMessage() {
+        public String message() {
             return message;
         }
 
-        public void setMessage(String message) {
+        public PatchSummaryInfo message(String message) {
             this.message = message;
+            return this;
         }
 
-        public Date getDate() {
+        public Date date() {
             return date;
         }
 
-        public void setDate(Date date) {
+        public PatchSummaryInfo date(Date date) {
             this.date = date;
+            return this;
         }
 
-        public String getPatch() {
+        public String patch() {
             return patch;
         }
 
-        public void setPatch(String patch) {
+        public PatchSummaryInfo patch(String patch) {
             this.patch = patch;
+            return this;
         }
 
-        public List<PatchInfo> getPatchs() {
+        public List<PatchInfo> patchs() {
             return patchs;
         }
 
-        public void setPatchs(List<PatchInfo> patchs) {
+        public PatchSummaryInfo patchs(List<PatchInfo> patchs) {
             this.patchs = patchs;
+            return this;
         }
     }
 
