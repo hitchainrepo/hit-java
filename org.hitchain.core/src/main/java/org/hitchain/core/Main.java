@@ -757,55 +757,23 @@ public class Main {
             if (list.isEmpty()) {
                 list.add(HitHelper.TYPE_help);
             }
-            boolean autoRename = false;
-            String name = null;
-            String token = null;
-            String uri = null;
-            for (int i = 0; i < list.size(); i++) {
-                if ("--auto-rename".equals(list.get(i))) {
-                    autoRename = true;
-                    list.remove(i);
-                    i = i - 1;
+            boolean autoRename = getOption(list, "--auto-rename", false, null, null) != null;
+            String name = getOption(list, "--name", true, "migrate option --name missing value.", HELP_MIGRATE);
+            String token = getOption(list, "--token", true, "migrate option --token missing value.", HELP_MIGRATE);
+            String maxPr = getOption(list, "--max-pr-size", true, "migrate option --max-pr-size missing value.", HELP_MIGRATE);
+            int maxPrSize = 20;
+            if (StringUtils.isNotBlank(maxPr)) {
+                maxPrSize = NumberHelper.getInt(maxPr, 0);
+                if (maxPrSize < 0) {
+                    System.err.println("migrate option --max-pr-size value invalid.");
+                    return;
                 }
             }
-            for (int i = 0; i < list.size(); i++) {
-                if ("--name".equals(list.get(i))) {
-                    {// remove options, so list.get(i) = name value.
-                        list.remove(i);
-                    }
-                    if (list.size() > i) {
-                        name = list.remove(i);
-                    } else {
-                        System.err.println("migrate option --name missing value.");
-                        System.out.println(HELP_MIGRATE);
-                        return;
-                    }
-                    i = i - 1;
-                }
-            }
-            for (int i = 0; i < list.size(); i++) {
-                if ("--token".equals(list.get(i))) {
-                    {// remove options, so list.get(i) = token value.
-                        list.remove(i);
-                    }
-                    if (list.size() > i) {
-                        token = list.remove(i);
-                    } else {
-                        System.err.println("migrate option --token missing value.");
-                        System.out.println(HELP_MIGRATE);
-                        return;
-                    }
-                    i = i - 1;
-                }
-            }
-            if (list.size() > 0) {
-                uri = list.get(0);
-            } else {
-                System.err.println("migrate missing uri.");
-                System.out.println(HELP_MIGRATE);
+            String uri = getOption(list, null, false, "migrate missing uri.", HELP_MIGRATE);
+            if (StringUtils.isBlank(uri)) {
                 return;
             }
-            Hit.migrate().uri(uri).autoRename(autoRename).name(name).token(token).call();
+            Hit.migrate().uri(uri).autoRename(autoRename).name(name).token(token).maxPrSize(maxPrSize).call();
             System.out.println(HELP_MIGRATE);
             return;
         }
@@ -814,21 +782,14 @@ public class Main {
             File gitDir = getGitDirectory();
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();// remove am
-            if (list.isEmpty()) {
-                list.add(HitHelper.TYPE_help);
-            }
-            String id = list.poll();// pathId
-            String p1 = list.poll(), p2 = list.poll(), p3 = list.poll(), p4 = list.poll();
+            boolean ignoreSpaceChange = getOption(list, "--ignore-space-change", false, null, null) != null;
+            boolean ignoreWhitespace = getOption(list, "--ignore-white-sapce", false, null, null) != null;
+            boolean forceMergeLine = getOption(list, "--force-merge", false, null, null) != null;
+            boolean noCommit = getOption(list, "--no-commit", false, null, null) != null;
+            String id = getOption(list, null, false, "am missing path id.", HELP_AM);
             if (StringUtils.isBlank(id)) {
-                System.out.println(HELP_AM);
                 return;
             }
-
-            boolean ignoreSpaceChange = StringUtils.equalsAny("--ignore-space-change", p1, p2, p3, p4);
-            boolean ignoreWhitespace = StringUtils.equalsAny("--ignore-white-sapce", p1, p2, p3, p4);
-            boolean forceMergeLine = StringUtils.equalsAny("--force-merge", p1, p2, p3, p4);
-            boolean noCommit = StringUtils.equalsAny("--no-commit", p1, p2, p3, p4);
-
             Hit hit = new Hit(new FileRepository(gitDir), true);
             hit.am().patchId(id).ignoreSpaceChange(ignoreSpaceChange).ignoreWhitespace(ignoreWhitespace).forceMergeLine(forceMergeLine).noCommit(noCommit).call();
             IOUtils.closeQuietly(hit);
@@ -888,10 +849,45 @@ public class Main {
         return projectDir;
     }
 
+    private static String getOption(LinkedList<String> options, String optionName, boolean hasValue, String errorMsg, String help) {
+        String value = null;
+        if (StringUtils.isBlank(optionName)) {// just get value from options.
+            if (options.size() > 0) {
+                return options.get(0);
+            }
+            System.err.println(errorMsg);
+            System.out.println(help);
+            return null;
+        }
+        for (int i = 0; i < options.size(); i++) {// get option by name
+            if (!optionName.equals(options.get(i))) {
+                continue;
+            }
+            if (hasValue) {
+                {// remove optionName, so options.get(i) = value.
+                    options.remove(i);
+                }
+                if (options.size() > i) {
+                    value = options.remove(i);
+                } else {
+                    System.err.println(errorMsg);
+                    System.out.println(help);
+                    return value;
+                }
+                i = i - 1;
+            } else {
+                options.remove(i);
+                i = i - 1;
+                value = "true";
+            }
+        }
+        return value;
+    }
+
     public static void main(String[] args) throws Exception {
         try {
             main0(args);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             e.printStackTrace();
             System.exit(1);
         }
