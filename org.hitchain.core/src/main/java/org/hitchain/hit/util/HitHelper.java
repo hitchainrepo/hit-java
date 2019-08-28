@@ -16,6 +16,7 @@ import org.hitchain.contract.api.ContractApi;
 import org.hitchain.hit.api.ProjectInfoFile;
 import org.iff.infra.util.FCS;
 import org.iff.infra.util.NumberHelper;
+import org.iff.infra.util.PreRequiredHelper;
 import org.iff.infra.util.SocketHelper;
 
 import java.io.*;
@@ -986,7 +987,18 @@ public class HitHelper {
         return null;
     }
 
-    public static void setEnv(ProcessBuilder pb){
+    public static void checkValidCfg() {
+        PreRequiredHelper.requireNotBlank(getAccountAddress(), "Hit account config not exists, add or set default account first: hit cfg account help");
+        PreRequiredHelper.requireNotBlank(getChain(), "Hit chain config not exists, add or set default chain first: hit cfg chain help");
+        PreRequiredHelper.requireNotBlank(getChainApi(), "Hit chainapi config not exists, add or set default chainapi first: hit cfg chainapi help");
+        PreRequiredHelper.requireNotBlank(getContract(), "Hit contract config not exists, add or set default contract first: hit cfg contract help");
+        PreRequiredHelper.requireNotBlank(getGas(), "Hit gas config not exists, add or set default gas first: hit cfg gas help");
+        PreRequiredHelper.requireNotBlank(getRepository(), "Hit repository config not exists, add or set default repository first: hit cfg repository help");
+        PreRequiredHelper.requireNotBlank(getRsaPubKey(), "Hit rsa config not exists, add or set default repository first: hit cfg rsa help");
+        PreRequiredHelper.requireNotBlank(getStorage(), "Hit storage config not exists, add or set default storage first: hit cfg storage help");
+    }
+
+    public static void setEnv(ProcessBuilder pb) {
         Map<String, String> environment = pb.environment();
         //TODO pb.
     }
