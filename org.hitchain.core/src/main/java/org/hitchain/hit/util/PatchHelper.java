@@ -625,7 +625,7 @@ public class PatchHelper {
         protected String message;
         protected Date date;
         protected String patch;
-        protected List<PatchInfo> patchs;
+        protected List<PatchInfo> patchs = new ArrayList<>();
 
         public String startRevision() {
             return startRevision;
