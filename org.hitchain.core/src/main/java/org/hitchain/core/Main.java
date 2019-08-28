@@ -133,7 +133,8 @@ public class Main {
 //        args = new String[]{"am", "05c6a12b7f6bd6a16ad57cbbefa8fff56cf330c4"};
 //        args = new String[]{"pr", "fetch", "https://github.com/ethereum/ethereumj.git"};
 //        args = new String[]{"pr", "fetch", "https://gitee.com/jfinal/jfinal.git"};
-//        args = new String[]{"migrate", "--auto-rename", "https://github.com/jdorn/json-editor.git"};
+//        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath");
+//        args = new String[]{"migrate", "--token", "5d65b7f90ebbc50e1af9091af3d808947bc598bd", "--auto-rename", "https://github.com/jdorn/json-editor.git"};
 //        args = new String[]{"token", "readToken", "0xf49ac47ae8b8ad61a5fa3858224969e07c35f3fa"};
 //        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/helloworld");
 //        args = new String[]{"contract", "add-repository", "--auto-rename"};
@@ -355,6 +356,9 @@ public class Main {
         }
         /*-----------------------------------------------------repository name-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "repository-name".equals(args[0])) {
+            {
+                HitHelper.checkValidCfg();
+            }
             if (args.length > 1) {
                 System.out.println(Hit.repositoryName().uri(args[1]).call());
                 return;
@@ -364,6 +368,9 @@ public class Main {
         }
         /*-----------------------------------------------------contract new-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "contract".equals(args[0])) {
+            {
+                HitHelper.checkValidCfg();
+            }
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
             if (list.isEmpty()) {
@@ -725,6 +732,9 @@ public class Main {
         }
         /*-----------------------------------------------------encrypt-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "encrypt".equals(args[0])) {
+            {
+                HitHelper.checkValidCfg();
+            }
             File gitDir = getGitDirectory();
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
@@ -752,10 +762,17 @@ public class Main {
         }
         /*-----------------------------------------------------migrate-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "migrate".equals(args[0])) {
+            {
+                HitHelper.checkValidCfg();
+            }
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
             if (list.isEmpty()) {
                 list.add(HitHelper.TYPE_help);
+            }
+            if (HitHelper.TYPE_help.equals(list.getFirst())) {
+                System.out.println(HELP_MIGRATE);
+                return;
             }
             boolean autoRename = getOption(list, "--auto-rename", false, null, null) != null;
             String name = getOption(list, "--name", true, "migrate option --name missing value.", HELP_MIGRATE);
@@ -779,6 +796,9 @@ public class Main {
         }
         /*-----------------------------------------------------am-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "am".equals(args[0])) {
+            {
+                HitHelper.checkValidCfg();
+            }
             File gitDir = getGitDirectory();
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();// remove am
@@ -797,6 +817,9 @@ public class Main {
         }
         /*-----------------------------------------------------am-----------------------------------------------------*/
         else if (args != null && args.length > 0 && ("pullrequest".equals(args[0]) || "pr".equals(args[0]))) {
+            {
+                HitHelper.checkValidCfg();
+            }
             File gitDir = getGitDirectory();
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
