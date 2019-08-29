@@ -147,6 +147,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
             {//
                 List<Map<String, Object>> summaries = new ArrayList<>();
                 File[] files = pullRequestFetch.listFiles();
+                files = files == null ? new File[0] : files;
                 Map<String/*commitName*/, String/*ipfsHash*/> map = new HashMap<>();
                 for (File f : files) {
                     if (!f.getName().endsWith(".patch")) {
@@ -228,9 +229,9 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
             String dateStr = (String) pull.get("created_at");
             Date date = DateUtils.parseDate(dateStr, new String[]{"yyyy-MM-dd'T'HH:mm:ss'Z'"});
             //
-            String patchs = httpGet2(patchUrl, "Try fetch pull request patch for {times} times, url {url}.");
+            String patchContent = httpGet2(patchUrl, "Try fetch pull request patch for {times} times, url {url}.");
             PatchHelper.PatchInfo pi = null;
-            if (patchs.isEmpty()) {
+            if (StringUtils.isBlank(patchContent)) {
                 // patchs could by empty in some case, such as a merge patch
                 // https://gitee.com/jfinal/jfinal/pulls/40.diff
                 // https://gitee.com/jfinal/jfinal/pulls/40.patch
@@ -261,7 +262,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                         .totalCommit(commitTotal)
                         .message(message)
                         .date(date)
-                        .patch(patchs);
+                        .patch(patchContent);
             }
             if (pi != null && commits.size() > 0) {
                 pi.commitIndex(1)
@@ -287,7 +288,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                 int files = 0, insertions = 0, deletions = 0;
                 String summary = "", patch = "";
                 try {
-                    String[] lines = StringUtils.split(patchs, "\n");
+                    String[] lines = StringUtils.split(patchContent, "\n");
                     String starts = "From " + currentCommit;
                     int mark = 0;
                     StringBuilder sb = new StringBuilder();
@@ -385,6 +386,10 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
         String pullUrl = FCS.get("https://gitee.com/api/v5/repos/{owner}/{repoName}/pulls?per_page=" + maxPrSize, owner, repoName).toString();
         String pullsJson = httpGet2(pullUrl, "Try fetch pull request for {times} times, url {url}.");
         List<Map<String, Object>> pulls = GsonHelper.toJsonList(pullsJson);
+        if (pulls == null) {
+            System.err.println("Can not fetch pull request from url: " + pullUrl);
+            return summaryInfos;
+        }
         for (Map<String, Object> pull : pulls) {
             System.out.println("Fetching pull request:" + pull.get("url"));
             // sample: https://gitee.com/jfinal/jfinal/pulls/40.patch
@@ -400,9 +405,9 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
             String dateStr = (String) pull.get("created_at");
             Date date = DateUtils.parseDate(dateStr, new String[]{"yyyy-MM-dd'T'HH:mm:ssXXX"});
             //
-            String patchs = httpGet2(patchUrl, "Try fetch pull request patch for {times} times, url {url}.");
+            String patchContent = httpGet2(patchUrl, "Try fetch pull request patch for {times} times, url {url}.");
             PatchHelper.PatchInfo pi = null;
-            if (patchs.isEmpty()) {
+            if (StringUtils.isBlank(patchContent)) {
                 // patchs could by empty in some case, such as a merge patch
                 // https://gitee.com/jfinal/jfinal/pulls/40.diff
                 // https://gitee.com/jfinal/jfinal/pulls/40.patch
@@ -413,7 +418,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                     System.err.println("Warning can not fetch patch: " + patchUrl);
                     continue;
                 }
-                pi = PatchHelper.parseDiff(new ByteArrayInputStream(ByteHelper.utf8(diffUrl)))
+                pi = PatchHelper.parseDiff(new ByteArrayInputStream(ByteHelper.utf8(diff)))
                         .date(date);
             }
             //
@@ -430,7 +435,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                         .totalCommit(commitTotal)
                         .message(message)
                         .date(date)
-                        .patch(patchs);
+                        .patch(patchContent);
             }
             if (pi != null && commits.size() > 0) {
                 pi.commitIndex(1)
@@ -442,6 +447,8 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                         .msg((String) MapHelper.getByPath(commits.get(0), "commit/message"))
                         .shortMsg(StringUtils.substringBefore(pi.msg(), "\n"))
                         .patch(pi.genPatch(pi.patch()));
+
+                summaryInfo.patch(pi.patch());// update patch content.
                 summaryInfo.patchs().add(pi);
                 continue;//no need to process commits.
             }
@@ -456,7 +463,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                 int files = 0, insertions = 0, deletions = 0;
                 String summary = "", patch = "";
                 try {
-                    String[] lines = StringUtils.split(patchs, "\n");
+                    String[] lines = StringUtils.split(patchContent, "\n");
                     String starts = "From " + currentCommit;
                     int mark = 0;
                     StringBuilder sb = new StringBuilder();
@@ -551,11 +558,13 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                 URL url = new URL(requestUrl);
                 {
                     connection = (HttpURLConnection) url.openConnection();
-                    connection.setDoOutput(true);
-                    connection.setInstanceFollowRedirects(true);
                     connection.setRequestMethod("GET");
-                    connection.setRequestProperty("charset", "UTF-8");
-                    connection.setRequestProperty("accept", "*/*");
+                    //connection.setDoOutput(true);
+                    //connection.setDoInput(true);
+                    connection.setInstanceFollowRedirects(true);
+                    connection.setRequestProperty("Charset", "UTF-8");
+                    connection.setRequestProperty("Accept", "*/*");
+                    connection.setRequestProperty("User-Agent", "hit/1.0.0");
                     if (StringUtils.isNotBlank(token)) {
                         connection.setRequestProperty("Authorization", "token " + token);
                     }
@@ -563,7 +572,13 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                     connection.setReadTimeout(60 * 1000);
                     connection.connect();
                 }
+                int responseCode = connection.getResponseCode();
+                String responseMessage = connection.getResponseMessage();
+                System.out.println(responseCode + " " + responseMessage);
                 content = IOUtils.toString(connection.getInputStream(), "UTF-8");
+                if (responseCode == 200) {
+                    return content;
+                }
             } catch (Exception e) {
             } finally {
                 try {

@@ -175,7 +175,7 @@ public class PatchHelper {
                 pi.files(files);
                 pi.insertions(insertions);
                 pi.deletions(deletions);
-                pi.summary(files + " files changed, " + insertions + " insertions(+), " + deletions + " deletions(-)");//TODO missing change details.
+                //pi.summary(files + " files changed, " + insertions + " insertions(+), " + deletions + " deletions(-)");//TODO missing change details.
             }
             return pi;
         } catch (Exception e) {
@@ -475,9 +475,9 @@ public class PatchHelper {
                     new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US).format(date()),
                     commitIndex(),
                     commitTotal(),
-                    shortMsg(),
-                    msg(),
-                    summary(),
+                    StringUtils.defaultString(shortMsg(), ""),
+                    StringUtils.defaultString(msg(), ""),
+                    StringUtils.defaultString(summary(), ""),
                     files(),
                     insertions(),
                     deletions(),
