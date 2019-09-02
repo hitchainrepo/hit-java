@@ -1192,7 +1192,11 @@ public class HitHelper {
         projectInfoFile.setRepoPriKey(privateKeyEncryptByOwnerRsaPubKey);
         for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
             String memberPubKey = ti.getMemberPubKeyRsa();
-            String privateKeyEncryptByMemberRsaPubKey = RSAHelper.encryptHex(privateKey, RSAHelper.getPublicKeyFromHex(memberPubKey));
+            String privateKeyEncryptByMemberRsaPubKey = Hex.toHexString(
+                    RSAHelper.encrypt(
+                            Hex.decode(privateKey),
+                            RSAHelper.getPublicKeyFromHex(memberPubKey)
+                    ));
             ti.setMemberRepoPriKey(privateKeyEncryptByMemberRsaPubKey);
         }
         GitHelper.updateWholeHitRepository(projectDir, projectInfoFile);
