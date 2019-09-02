@@ -133,8 +133,9 @@ public class Main {
 //        args = new String[]{"am", "05c6a12b7f6bd6a16ad57cbbefa8fff56cf330c4"};
 //        args = new String[]{"pr", "fetch", "https://github.com/ethereum/ethereumj.git"};
 //        args = new String[]{"pr", "fetch", "https://gitee.com/jfinal/jfinal.git"};
-//        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath");
-//        args = new String[]{"migrate", "--token", "5d65b7f90ebbc50e1af9091af3d808947bc598bd", "--auto-rename", "https://github.com/jdorn/json-editor.git"};
+//        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/test");
+//        args = new String[]{"am", "10c0a84792fc6ec8cb52c52da09c8874fb8583e0"};
+        //args = new String[]{"migrate", "--auto-rename", "https://gitee.com/52itstyle/spring-boot-seckill.git"};
 //        args = new String[]{"token", "readToken", "0xf49ac47ae8b8ad61a5fa3858224969e07c35f3fa"};
 //        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/helloworld");
 //        args = new String[]{"contract", "add-repository", "--auto-rename"};
@@ -545,7 +546,7 @@ public class Main {
                 return;
             }
             if ("add-member".equals(operation)) {
-                System.out.println(cmd.addMember(p1));
+                System.out.println(cmd.addMember(p1, p2));
                 return;
             }
             if ("remove-member".equals(operation)) {

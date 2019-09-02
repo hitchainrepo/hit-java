@@ -8,8 +8,11 @@
 package org.eclipse.jgit.api;
 
 import org.apache.commons.lang3.StringUtils;
+import org.hitchain.contract.api.ContractApi;
 import org.hitchain.contract.api.HitRepositoryContractEthereumApi;
 import org.hitchain.contract.ethereum.HitRepositoryContractEthereumService;
+import org.hitchain.hit.api.ProjectInfoFile;
+import org.hitchain.hit.util.GitHelper;
 import org.hitchain.hit.util.HitHelper;
 import org.iff.infra.util.Tuple;
 
@@ -251,11 +254,33 @@ public class HitRepositoryContractCommand implements Callable<Hit> {
     /**
      * add repository member.
      *
-     * @param address member address
+     * @param address   member address
+     * @param rsaPubKey member rsa pub key
      * @return if has error return result starts with "ERROR:"
      */
-    public String addMember(String address) {
-        return api.writeAddMember(repositoryId(), address, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress(), gasLimit(), gWei());
+    public String addMember(String address, String rsaPubKey) {
+        ProjectInfoFile pif = hit().projectInfoFile();
+        if (StringUtils.isBlank(address)) {
+            return "ERROR: member address is required.";
+        }
+        if (StringUtils.isBlank(rsaPubKey)) {
+            return "ERROR: member rsa public key is required.";
+        }
+        if (pif.isPrivate()) {
+            pif.addMemberPrivate(address, rsaPubKey, address, HitHelper.getRsaPriKeyWithPasswordInput());
+        } else {
+            pif.addMemberPublic(address, rsaPubKey, address);
+        }
+        String result = null;
+        if (!hasAddress(HitRepositoryContractEthereumApi.TYPE_MEMBER, address)) {
+            result = api.writeAddMember(repositoryId(), address, HitHelper.getAccountPriKeyWithPasswordInput(), contractAddress(), gasLimit(), gWei());
+        } else {
+            result = "OK the member already exists.";
+        }
+        if (!ContractApi.isError(result)) {
+            GitHelper.updateHitRepositoryProjectInfoFile(hit().getRepository().getDirectory(), pif);
+        }
+        return result;
     }
 
     /**
