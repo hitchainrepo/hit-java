@@ -129,12 +129,12 @@ public class HitIPFSStorage {
      * @throws IOException
      */
     public byte[] get(String filePath) throws IOException {
-        System.out.println("get filename:" + filePath);
+        //System.out.println("get filename:" + filePath);
         Two<Object, String, String> ipfsHashAndSha1 = gitFileIndex.get(filePath);
         if (ipfsHashAndSha1 == null || StringUtils.isBlank(ipfsHashAndSha1.first())) {
             throw new FileNotFoundException("File not found: " + filePath);
         }
-        System.out.println("get filename:" + filePath + ", ipfs:" + ipfsHashAndSha1.first() + ", sha1:" + ipfsHashAndSha1.second());
+        //System.out.println("get filename:" + filePath + ", ipfs:" + ipfsHashAndSha1.first() + ", sha1:" + ipfsHashAndSha1.second());
         byte[] content = ipfs.cat(Multihash.fromBase58(ipfsHashAndSha1.first()));
         //System.out.println("file content:" + new String(content));
         String rsaPriKeyWithPasswordInput = null;
