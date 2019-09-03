@@ -86,7 +86,7 @@ public class Main {
             "hit repository-name uri\n";
     public static final String HELP_CONTRACT = "" +
             "hit contract help\n" +
-            "hit contract add-repository repositoryName\n" +
+            "hit contract add-repository [--auto-rename] [repositoryName]\n" +
             "hit contract user\n" +
             "hit contract email\n" +
             "hit contract max-id\n" +
@@ -101,7 +101,7 @@ public class Main {
             "hit contract disable-[delegator|member|pr-member|pr-auth|pr-comm]\n" +
             "hit contract update-repository  repositoryName\n" +
             "hit contract update-url         repositoryUrl\n" +
-            "hit contract [add|remove]-[delegator|member|pr-member]      address\n" +
+            "hit contract [add|remove]-[delegator|member|pr-member]      address [rsaPubKeyForAddMember]\n" +
             "hit contract add-pr                      prUrl\n" +
             "hit contract add-started                 repositoryUrl\n" +
             "hit contract remove-started              index\n" +
@@ -158,8 +158,7 @@ public class Main {
                     "migrate", new HashSet<>(),
                     "pullrequest", new HashSet<>(Arrays.asList("create")),
                     "pr", new HashSet<>(Arrays.asList("create")),
-                    "push", new HashSet<>(),
-                    "fetch", new HashSet<>()
+                    "push", new HashSet<>()
             );
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             if (!HitHelper.getHitConfig().isEmpty() && args.length > 0) {
