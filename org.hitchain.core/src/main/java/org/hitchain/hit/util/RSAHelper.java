@@ -200,6 +200,25 @@ public class RSAHelper {
     }
 
     /**
+     * Encrypt a text using public/private key. The result is enctypted BASE64
+     * encoded text
+     *
+     * @param text The original unencrypted text
+     * @param key  The public/private key
+     * @return Encrypted text encoded as BASE64
+     */
+    public static String encryptHex(String text, Key key) {
+        String encryptedText = null;
+        try {
+            byte[] cipherText = encrypt(text.getBytes("UTF8"), key);
+            encryptedText = Hex.encodeHexString(cipherText);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return encryptedText;
+    }
+
+    /**
      * Decrypt text using public/private key
      *
      * @param text The encrypted text

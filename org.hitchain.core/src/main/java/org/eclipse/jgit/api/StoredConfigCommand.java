@@ -42,7 +42,20 @@ public class StoredConfigCommand implements Callable<String> {
     }
 
     public StoredConfigCommand getRepositoryAddress() {
-        return type("get-repository-address").section("remote").subSection("origin").name("url");
+        return type("get").section("remote").subSection("origin").name("url");
+    }
+
+    public StoredConfigCommand getUserName() {
+        return type("get").section("user").subSection(null).name("name");
+    }
+
+
+    public StoredConfigCommand getUserEmail() {
+        return type("get").section("user").subSection(null).name("email");
+    }
+
+    public StoredConfigCommand getRemoteUrl() {
+        return type("get").section("remote").subSection("origin").name("url");
     }
 
     @Override
@@ -60,7 +73,7 @@ public class StoredConfigCommand implements Callable<String> {
             config.save();
             return "OK";
         }
-        if ("get".equals(type()) || "get-repository-address".equals(type())) {
+        if ("get".equals(type())) {
             return config.getString(section(), subSection(), name());
         }
         return null;

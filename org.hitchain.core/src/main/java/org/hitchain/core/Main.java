@@ -133,7 +133,9 @@ public class Main {
 //        args = new String[]{"am", "05c6a12b7f6bd6a16ad57cbbefa8fff56cf330c4"};
 //        args = new String[]{"pr", "fetch", "https://github.com/ethereum/ethereumj.git"};
 //        args = new String[]{"pr", "fetch", "https://gitee.com/jfinal/jfinal.git"};
-//        args = new String[]{"migrate", "--auto-rename", "https://github.com/jdorn/json-editor.git"};
+//        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/test");
+//        args = new String[]{"am", "10c0a84792fc6ec8cb52c52da09c8874fb8583e0"};
+        //args = new String[]{"migrate", "--auto-rename", "https://gitee.com/52itstyle/spring-boot-seckill.git"};
 //        args = new String[]{"token", "readToken", "0xf49ac47ae8b8ad61a5fa3858224969e07c35f3fa"};
 //        System.setProperty("git_work_tree", "/Users/zhaochen/Desktop/temppath/helloworld");
 //        args = new String[]{"contract", "add-repository", "--auto-rename"};
@@ -355,6 +357,9 @@ public class Main {
         }
         /*-----------------------------------------------------repository name-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "repository-name".equals(args[0])) {
+            {
+                HitHelper.checkValidCfg();
+            }
             if (args.length > 1) {
                 System.out.println(Hit.repositoryName().uri(args[1]).call());
                 return;
@@ -364,6 +369,9 @@ public class Main {
         }
         /*-----------------------------------------------------contract new-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "contract".equals(args[0])) {
+            {
+                HitHelper.checkValidCfg();
+            }
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
             if (list.isEmpty()) {
@@ -538,7 +546,7 @@ public class Main {
                 return;
             }
             if ("add-member".equals(operation)) {
-                System.out.println(cmd.addMember(p1));
+                System.out.println(cmd.addMember(p1, p2));
                 return;
             }
             if ("remove-member".equals(operation)) {
@@ -725,6 +733,9 @@ public class Main {
         }
         /*-----------------------------------------------------encrypt-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "encrypt".equals(args[0])) {
+            {
+                HitHelper.checkValidCfg();
+            }
             File gitDir = getGitDirectory();
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
@@ -752,83 +763,54 @@ public class Main {
         }
         /*-----------------------------------------------------migrate-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "migrate".equals(args[0])) {
+            {
+                HitHelper.checkValidCfg();
+            }
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
             if (list.isEmpty()) {
                 list.add(HitHelper.TYPE_help);
             }
-            boolean autoRename = false;
-            String name = null;
-            String token = null;
-            String uri = null;
-            for (int i = 0; i < list.size(); i++) {
-                if ("--auto-rename".equals(list.get(i))) {
-                    autoRename = true;
-                    list.remove(i);
-                    i = i - 1;
-                }
-            }
-            for (int i = 0; i < list.size(); i++) {
-                if ("--name".equals(list.get(i))) {
-                    {// remove options, so list.get(i) = name value.
-                        list.remove(i);
-                    }
-                    if (list.size() > i) {
-                        name = list.remove(i);
-                    } else {
-                        System.err.println("migrate option --name missing value.");
-                        System.out.println(HELP_MIGRATE);
-                        return;
-                    }
-                    i = i - 1;
-                }
-            }
-            for (int i = 0; i < list.size(); i++) {
-                if ("--token".equals(list.get(i))) {
-                    {// remove options, so list.get(i) = token value.
-                        list.remove(i);
-                    }
-                    if (list.size() > i) {
-                        token = list.remove(i);
-                    } else {
-                        System.err.println("migrate option --token missing value.");
-                        System.out.println(HELP_MIGRATE);
-                        return;
-                    }
-                    i = i - 1;
-                }
-            }
-            if (list.size() > 0) {
-                uri = list.get(0);
-            } else {
-                System.err.println("migrate missing uri.");
+            if (HitHelper.TYPE_help.equals(list.getFirst())) {
                 System.out.println(HELP_MIGRATE);
                 return;
             }
-            Hit.migrate().uri(uri).autoRename(autoRename).name(name).token(token).call();
+            boolean autoRename = getOption(list, "--auto-rename", false, null, null) != null;
+            String name = getOption(list, "--name", true, "migrate option --name missing value.", HELP_MIGRATE);
+            String token = getOption(list, "--token", true, "migrate option --token missing value.", HELP_MIGRATE);
+            String maxPr = getOption(list, "--max-pr-size", true, "migrate option --max-pr-size missing value.", HELP_MIGRATE);
+            int maxPrSize = 20;
+            if (StringUtils.isNotBlank(maxPr)) {
+                maxPrSize = NumberHelper.getInt(maxPr, 0);
+                if (maxPrSize < 0) {
+                    System.err.println("migrate option --max-pr-size value invalid.");
+                    return;
+                }
+            }
+            String uri = getOption(list, null, false, "migrate missing uri.", HELP_MIGRATE);
+            if (StringUtils.isBlank(uri)) {
+                return;
+            }
+            Hit.migrate().uri(uri).autoRename(autoRename).name(name).token(token).maxPrSize(maxPrSize).call();
             System.out.println(HELP_MIGRATE);
             return;
         }
         /*-----------------------------------------------------am-----------------------------------------------------*/
         else if (args != null && args.length > 0 && "am".equals(args[0])) {
+            {
+                HitHelper.checkValidCfg();
+            }
             File gitDir = getGitDirectory();
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();// remove am
-            if (list.isEmpty()) {
-                list.add(HitHelper.TYPE_help);
-            }
-            String id = list.poll();// pathId
-            String p1 = list.poll(), p2 = list.poll(), p3 = list.poll(), p4 = list.poll();
+            boolean ignoreSpaceChange = getOption(list, "--ignore-space-change", false, null, null) != null;
+            boolean ignoreWhitespace = getOption(list, "--ignore-white-sapce", false, null, null) != null;
+            boolean forceMergeLine = getOption(list, "--force-merge", false, null, null) != null;
+            boolean noCommit = getOption(list, "--no-commit", false, null, null) != null;
+            String id = getOption(list, null, false, "am missing path id.", HELP_AM);
             if (StringUtils.isBlank(id)) {
-                System.out.println(HELP_AM);
                 return;
             }
-
-            boolean ignoreSpaceChange = StringUtils.equalsAny("--ignore-space-change", p1, p2, p3, p4);
-            boolean ignoreWhitespace = StringUtils.equalsAny("--ignore-white-sapce", p1, p2, p3, p4);
-            boolean forceMergeLine = StringUtils.equalsAny("--force-merge", p1, p2, p3, p4);
-            boolean noCommit = StringUtils.equalsAny("--no-commit", p1, p2, p3, p4);
-
             Hit hit = new Hit(new FileRepository(gitDir), true);
             hit.am().patchId(id).ignoreSpaceChange(ignoreSpaceChange).ignoreWhitespace(ignoreWhitespace).forceMergeLine(forceMergeLine).noCommit(noCommit).call();
             IOUtils.closeQuietly(hit);
@@ -836,6 +818,9 @@ public class Main {
         }
         /*-----------------------------------------------------am-----------------------------------------------------*/
         else if (args != null && args.length > 0 && ("pullrequest".equals(args[0]) || "pr".equals(args[0]))) {
+            {
+                HitHelper.checkValidCfg();
+            }
             File gitDir = getGitDirectory();
             LinkedList<String> list = new LinkedList<>(Arrays.asList(args));
             list.poll();
@@ -888,10 +873,45 @@ public class Main {
         return projectDir;
     }
 
+    private static String getOption(LinkedList<String> options, String optionName, boolean hasValue, String errorMsg, String help) {
+        String value = null;
+        if (StringUtils.isBlank(optionName)) {// just get value from options.
+            if (options.size() > 0) {
+                return options.get(0);
+            }
+            System.err.println(errorMsg);
+            System.out.println(help);
+            return null;
+        }
+        for (int i = 0; i < options.size(); i++) {// get option by name
+            if (!optionName.equals(options.get(i))) {
+                continue;
+            }
+            if (hasValue) {
+                {// remove optionName, so options.get(i) = value.
+                    options.remove(i);
+                }
+                if (options.size() > i) {
+                    value = options.remove(i);
+                } else {
+                    System.err.println(errorMsg);
+                    System.out.println(help);
+                    return value;
+                }
+                i = i - 1;
+            } else {
+                options.remove(i);
+                i = i - 1;
+                value = "true";
+            }
+        }
+        return value;
+    }
+
     public static void main(String[] args) throws Exception {
         try {
             main0(args);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             e.printStackTrace();
             System.exit(1);
         }
