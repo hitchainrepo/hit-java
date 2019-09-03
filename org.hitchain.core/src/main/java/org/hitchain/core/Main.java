@@ -99,6 +99,7 @@ public class Main {
             "hit contract index-of-[delegator|member|pr-member|pr-auth|pr-comm|started] index\n" +
             "hit contract is-[delegator|member|pr-member|pr-auth|pr-comm]-disable\n" +
             "hit contract disable-[delegator|member|pr-member|pr-auth|pr-comm]\n" +
+            "hit contract enable-[delegator|member|pr-member|pr-auth|pr-comm]\n" +
             "hit contract update-repository  repositoryName\n" +
             "hit contract update-url         repositoryUrl\n" +
             "hit contract [add|remove]-[delegator|member|pr-member]      address [rsaPubKeyForAddMember]\n" +
@@ -590,6 +591,26 @@ public class Main {
             }
             if ("disable-pr-comm".equals(operation)) {
                 System.out.println(cmd.disableType(HitRepositoryContractEthereumApi.TYPE_PR_COMM));
+                return;
+            }
+            if ("enable-delegator".equals(operation)) {
+                System.out.println(cmd.enableType(HitRepositoryContractEthereumApi.TYPE_DELEGATOR));
+                return;
+            }
+            if ("enable-member".equals(operation)) {
+                System.out.println(cmd.enableType(HitRepositoryContractEthereumApi.TYPE_MEMBER));
+                return;
+            }
+            if ("enable-pr-member".equals(operation)) {
+                System.out.println(cmd.enableType(HitRepositoryContractEthereumApi.TYPE_PR_MEMBER));
+                return;
+            }
+            if ("enable-pr-auth".equals(operation)) {
+                System.out.println(cmd.enableType(HitRepositoryContractEthereumApi.TYPE_PR_AUTH));
+                return;
+            }
+            if ("enable-pr-comm".equals(operation)) {
+                System.out.println(cmd.enableType(HitRepositoryContractEthereumApi.TYPE_PR_COMM));
                 return;
             }
             //========================================
