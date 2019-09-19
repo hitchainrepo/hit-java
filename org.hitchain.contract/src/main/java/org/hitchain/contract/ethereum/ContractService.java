@@ -11,8 +11,7 @@ package org.hitchain.contract.ethereum;
 
 import org.apache.commons.lang3.StringUtils;
 import org.hitchain.contract.api.ContractApi;
-import org.iff.infra.util.JsonHelper;
-import org.iff.infra.util.PreRequiredHelper;
+import org.iff.infra.util.*;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.datatypes.Function;
@@ -21,8 +20,10 @@ import org.web3j.crypto.Credentials;
 import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.TransactionEncoder;
 import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.Transaction;
+import org.web3j.protocol.core.methods.response.EthBlock;
 import org.web3j.protocol.core.methods.response.EthCall;
 import org.web3j.protocol.core.methods.response.EthSendTransaction;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
@@ -32,6 +33,7 @@ import org.web3j.utils.Numeric;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigInteger;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -48,15 +50,16 @@ public class ContractService implements ContractApi {
     public static Web3j getWeb3j() {
         return Web3jHelper.getWeb3j();
     }
-//// browse repository name contract.
+
+//    // browse repository name contract.
 //    public static void main(String[] args) throws Exception {
-//        EthBlock.Block block = getWeb3j().ethGetBlockByNumber(DefaultBlockParameter.valueOf(BigInteger.valueOf(5595195)), true).send().getBlock();
+//        EthBlock.Block block = getWeb3j().ethGetBlockByNumber(DefaultBlockParameter.valueOf(BigInteger.valueOf(6157647)), true).send().getBlock();
 //        System.out.println(GsonHelper.toJsonString(block));
 //        for (EthBlock.TransactionResult<EthBlock.TransactionObject> tr : block.getTransactions()) {
 //            EthBlock.TransactionObject transactionObject = tr.get();
 //            String input = transactionObject.getInput();
-//            if (input.length() == RepositoryNameContract.repositoryNameByteCode.length() + 2 + "0000000000000000000000008ab9cff82197b9673ec6e26c41176798f88f2cb5".length()) {
-//                if (RepositoryNameContract.repositoryNameByteCode.equals(input.substring(2, 2 + RepositoryNameContract.repositoryNameByteCode.length()))) {
+//            if (input.length() == HitRepositoryContract.bytes.length() + 2 + "000000000000000000000000ebe25b9d8458bc6477150e25f17d33637ac2d0b8".length()) {
+//                if (HitRepositoryContract.bytes.equals(input.substring(2, 2 + HitRepositoryContract.bytes.length()))) {
 //                    System.out.println(GsonHelper.toJsonString(tr));
 //                    System.out.println(input);
 //                    RequestHelper.RequestResult result = RequestHelper.get("http://api-ropsten.etherscan.io/api",
@@ -67,7 +70,7 @@ public class ContractService implements ContractApi {
 //                                    "startblock", transactionObject.getBlockNumber().toString(),
 //                                    "endblock", transactionObject.getBlockNumber().toString(),
 //                                    "sort", "desc",
-//                                    "apikey", "YourApiKeyToken"
+//                                    "apikey", "4FRNGDE368JXVQ8VXPP5DBME1HY81YXCDA"
 //                            ),
 //                            Collections.EMPTY_MAP);
 //                    System.out.println(((List<Map>) result.getBodyAsJson().get("result")).get(0).get("contractAddress"));
