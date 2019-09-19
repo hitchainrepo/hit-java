@@ -42,18 +42,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 public class ApplyHelper {
 
-    public static void main(String[] args) throws Exception {
-        //String path = "/Users/zhaochen/Desktop/temppath/mergepr/migrate/.git/pullrequest/pullrequest.patch";
-        String path = "/Users/zhaochen/Desktop/1249.patch";
-        List<PatchHelper.PatchFileInfo> infos = PatchHelper.parsePatch(new ByteArrayInputStream(FileUtils.readFileToByteArray(new File(path))));
-        System.out.println(infos);
-        for (PatchHelper.PatchFileInfo pfi : infos) {
-            Patch patch = new Patch();
-            patch.parse(new ByteArrayInputStream(pfi.diff().getBytes("UTF-8")));
-            System.out.println(patch.getErrors());
-        }
-    }
-
     public static ApplyCommand createApply(Repository repository) {
         return new ApplyCommand(repository);
     }
