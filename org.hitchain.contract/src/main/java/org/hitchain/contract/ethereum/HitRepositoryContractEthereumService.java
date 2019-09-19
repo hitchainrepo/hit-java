@@ -39,16 +39,6 @@ public class HitRepositoryContractEthereumService extends ContractService implem
     public static final String CONTRACT_READ = "FromAddress={0}\nContractAddress={1}\nFunctionName={2}\nFunctionType={3}\nArg0={4}\nArg1={5}\nArg2={6}\n";
     public static final String CONTRACT_WRITE = "PrivateKey={0}\nContractAddress={1}\nFunctionName={2}\nFunctionType={3}\nArg0={4}\nArg1={5}\nArg2={6}\nGasLimit={7}\nGwei={8}\n";
 
-    public static void main(String[] args) {
-        HitRepositoryContractEthereumService service = new HitRepositoryContractEthereumService();
-        String key = InputHelper.getContent("Private Key:");
-        String contract = service.deployContract(key, 5000000, 10);
-        System.out.println("Contract:" + contract);
-        if (ContractApi.isError(contract)) {
-            return;
-        }
-    }
-
     public static HitRepositoryContractEthereumApi getApi() {
         ContractApi.setInstance(HitRepositoryContractEthereumApi.class, new HitRepositoryContractEthereumService());
         return (HitRepositoryContractEthereumApi) ContractApi.getInstance(HitRepositoryContractEthereumApi.class);
