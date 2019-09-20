@@ -998,11 +998,6 @@ public class HitHelper {
         PreRequiredHelper.requireNotBlank(getStorage(), "Hit storage config not exists, add or set default storage first: hit cfg storage help");
     }
 
-    public static void setEnv(ProcessBuilder pb) {
-        Map<String, String> environment = pb.environment();
-        //TODO pb.
-    }
-
     public static String readPassword() {
         if (StringUtils.isNotBlank(passwordCache)) {
             return WalletHelper.decryptWithPasswordHex(passwordCache, passwordEncrypt);
