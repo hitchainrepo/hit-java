@@ -429,7 +429,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
             List<Map<String, Object>> commits = GsonHelper.toJsonList(commitsJson);
             int commitIndex = 0, commitTotal = commits.size();
             PatchHelper.PatchSummaryInfo summaryInfo = new PatchHelper.PatchSummaryInfo();
-            {
+            {// create summary information
                 summaryInfos.add(summaryInfo);
                 summaryInfo.startRevision(startRevision)
                         .endRevision(endRevision)
@@ -440,7 +440,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                         .date(date)
                         .patch(patchContent);
             }
-            if (pi != null && commits.size() > 0) {
+            if (pi != null && commits.size() > 0) {// patch is empty and fetch from diff.
                 pi.commitIndex(1)
                         .commitTotal(1)
                         .endCommit((String) commits.get(0).get("sha"))
@@ -455,6 +455,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                 summaryInfo.patchs().add(pi);
                 continue;//no need to process commits.
             }
+            // patch is not empty
             for (Map<String, Object> commit : commits) {
                 commitIndex += 1;
                 String parentCommit = (String) MapHelper.getByPath(commit, "parents/sha");
@@ -503,7 +504,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                 } catch (Exception e) {
                     System.err.println("Warning " + e.getMessage());
                 }
-                {
+                {// create patch information.
                     PatchHelper.PatchInfo patchInfo = new PatchHelper.PatchInfo()
                             .commitIndex(commitIndex)
                             .commitTotal(commitTotal)
