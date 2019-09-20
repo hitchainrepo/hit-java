@@ -196,7 +196,10 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
         if (StringUtils.contains(gitUrl, "gitee.com")) {
             return fetchPullRequestFromGiteeServer(repo, gitUrl, maxPrSize);
         }
-        return fetchPullRequestFromGitServer(repo, gitUrl, maxPrSize);
+        if (StringUtils.contains(gitUrl, "github.com")) {
+            return fetchPullRequestFromGitServer(repo, gitUrl, maxPrSize);
+        }
+        throw new RuntimeException("Git url not support yet: " + gitUrl);
     }
 
     protected List<PatchHelper.PatchSummaryInfo> fetchPullRequestFromGitServer(Repository repo, String gitUrl, int maxPrSize) throws Exception {
