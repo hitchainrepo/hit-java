@@ -1277,19 +1277,13 @@ public class HitHelper {
             git = new Git(repo);
             prDir.mkdir();
             currentBanch = repo.getBranch();
-            //String defaultBranch = GitHelper.findDefaultBranch(gitDir);
             String commitName = (String) pullRequestSummaryInfo.get("start_commit");
             String currentBranch = repo.exactRef(Constants.HEAD).getTarget().getName();
             branchName = "pr-" + commitName.substring(0, 5);
             git.checkout().setCreateBranch(true).setName(branchName).setStartPoint(commitName).call();
             System.out.println("Branch " + branchName + " is created for pull request.");
-            //if (!StringUtils.equals(commitName, (String) pullRequestSummaryInfo.get("start_commit"))) {
-            //    System.err.println("Current HEAD revision not match the pull request revision: " + (String) pullRequestSummaryInfo.get("start_commit"));
-            //    return false;
-            //}
             byte[] patchBytes = GitHelper.readFileFromIpfs((String) pullRequestSummaryInfo.get("patch_hash"));
             FileUtils.writeByteArrayToFile(new File(prDir, "pullrequest.patch"), patchBytes);
-            //git.apply().setPatch(new ByteArrayInputStream(patchBytes)).call();
             {
                 List<PatchHelper.PatchFileInfo> patchFileInfos = PatchHelper.parsePatch(new ByteArrayInputStream(patchBytes));
                 for (PatchHelper.PatchFileInfo pfi : patchFileInfos) {
@@ -1304,19 +1298,13 @@ public class HitHelper {
                     }
                 }
                 git.checkout().setName(currentBanch).call();
-                //git.branchDelete().setBranchNames(branchName).setForce(true).call();
                 FileUtils.deleteQuietly(prDir);
             }
-            //System.out.println("Checkout merge branch: git checkout " + branchName);
-            //System.out.println("Patch by hand: git am --ignore-space-change --ignore-whitespace .git/pullrequest/pullrequest.patch");
-            //System.out.println("Remove Folder: rm -rf .git/pullrequest");
-            //System.out.println("Switch to working branch: git checkout " + currentBanch);
             System.out.println("Merge: hit merge " + branchName);
             System.out.println("Remove pull request branch: hit branch -D " + branchName);
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
-            //FileUtils.deleteQuietly(prDir);
             if (branchName != null && git != null) {
                 try {
                     git.checkout().setCreateBranch(false).setName(currentBanch).call();
