@@ -1087,65 +1087,6 @@ public class HitHelper {
         System.out.println(sb);
     }
 
-//    public static boolean removeMember(File projectDir, String member, String memberAddressEcc, ProjectInfoFile projectInfoFile) {
-//        ProjectInfoFile.TeamInfo teamInfo = null;
-//        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
-//            if (StringUtils.equals(ti.getMember(), member)) {
-//                teamInfo = ti;
-//                break;
-//            }
-//        }
-//        if (teamInfo == null) {
-//            System.out.println("No member found.");
-//            return true;
-//        }
-//        projectInfoFile.getMembers().remove(teamInfo);
-//        String result = EthereumHelper.removeTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc);
-//        if (EthereumHelper.isError(result)) {
-//            System.err.println("Remove member error:" + result);
-//            System.exit(1);
-//        }
-//        if (!GitHelper.updateHitRepositoryProjectInfoFile(projectDir, projectInfoFile)) {
-//            System.err.println("Update project info file error.");
-//            System.exit(1);
-//        }
-//        System.out.println("Member has removed in the contract.");
-//        return true;
-//    }
-
-//    public static void addMember(File projectDir, String member, String memberPubKeyRsa, String memberAddressEcc, ProjectInfoFile projectInfoFile) {
-//        if (StringUtils.isBlank(member) || StringUtils.isBlank(memberPubKeyRsa) || StringUtils.isBlank(memberAddressEcc)) {
-//            System.err.println("Can't not execute command.");
-//            System.exit(1);
-//        }
-//        for (ProjectInfoFile.TeamInfo ti : projectInfoFile.getMembers()) {
-//            if (StringUtils.equals(ti.getMember(), member) || StringUtils.equals(ti.getMemberAddressEcc(), memberAddressEcc)) {
-//                System.out.println("Member is exists.");
-//                return;
-//            }
-//        }
-//        if (projectInfoFile.isPrivate()) {
-//            projectInfoFile.addMemberPrivate(member, memberPubKeyRsa, memberAddressEcc, HitHelper.getRsaPriKeyWithPasswordInput());
-//        } else {
-//            projectInfoFile.addMemberPublic(member, memberPubKeyRsa, memberAddressEcc);
-//        }
-//        if (EthereumHelper.hasTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc)) {
-//            System.out.println("Member is exists in the contract.");
-//            return;
-//        }
-//        String result = EthereumHelper.addTeamMember(projectInfoFile.getEthereumUrl(), projectInfoFile.getRepoAddress(), memberAddressEcc);
-//        if (EthereumHelper.isError(result)) {
-//            System.err.println("Add member error:" + result);
-//            System.exit(1);
-//        }
-//        if (!GitHelper.updateHitRepositoryProjectInfoFile(projectDir, projectInfoFile)) {
-//            System.err.println("Update project info file error.");
-//            System.exit(1);
-//        }
-//        System.out.println("Member has added in the contract.");
-//        return;
-//    }
-
     public static ProjectInfoFile getProjectInfoFile(File projectDir) {
         ProjectInfoFile projectInfoFile = null;
         if (GitHelper.existProjectInfoFile(projectDir)) {
