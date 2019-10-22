@@ -27,7 +27,6 @@ public class ProjectInfoFileTest {
             "7c8c7de9395403a42b1dd656d1624b637031fa37a7f72ddae98a7aadbed73728554858a19a6b993528e678d048d0745ba898d3af733d9365f067b49ccc77128919bf63134740c57ac40d62b288d6b1c902adc075853057a44994b12527a2812a26f41669d2acd4cca945ea30289ae6ac38a8a7921d2d6729663a14b29857d5c3\n" +
             "{\n" +
             "  \"version\": \"1\",\n" +
-            "  \"ethereumUrl\": \"https://121.40.127.45:1443\",\n" +
             "  \"fileServerUrl\": \"121.40.127.45\",\n" +
             "  \"repoName\": \"spring-boot-seckill-20190829161143\",\n" +
             "  \"repoAddress\": \"0x48e154cb7040602163236df58a8cc3c0836425e1-6\",\n" +
