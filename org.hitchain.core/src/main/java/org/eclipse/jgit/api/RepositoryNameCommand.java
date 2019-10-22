@@ -52,9 +52,9 @@ public class RepositoryNameCommand implements Callable<String> {
         String path = uriIsh.getRawPath();
         if (StringUtils.isBlank(path)) {
             path = host;
-            host = HitHelper.getRepository();
+            //host = HitHelper.getRepository();
         } else {
-            host = "https://" + host;
+            //host = "https://" + host;
         }
         String repoAddress = StringUtils.removeEnd(StringUtils.removeStart(path, "/"), ".git");
         String contractAddress = StringUtils.substringBefore(repoAddress, "-");

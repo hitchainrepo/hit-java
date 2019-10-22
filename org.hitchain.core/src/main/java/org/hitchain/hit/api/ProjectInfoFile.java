@@ -25,7 +25,6 @@ import java.util.List;
  * sign: 数据签名的 HASH 码，以用于验证下面数据的准确性
  * {
  * version: 1, 版本
- * ethereumUrl: the ethereum entrance url, Erhereum入口 URL
  * fileServerUrl: the file server url, could be ipfs entrance url, 文件服务器入口 URL
  * repoName: /userName/repoName.git, 仓库名称
  * repoPriKey: 代码仓库的私钥（由拥有者的私钥加密）
@@ -62,10 +61,6 @@ public class ProjectInfoFile implements Serializable {
      * 版本
      **/
     private String version;
-    /**
-     * Erhereum入口 URL
-     **/
-    private String ethereumUrl;
     /**
      * 文件服务器入口 URL
      **/
@@ -114,7 +109,6 @@ public class ProjectInfoFile implements Serializable {
         ECKey helloKeyEcc = new ECKey();
         ProjectInfoFile info = new ProjectInfoFile();
         info.version = "1";
-        info.ethereumUrl = "test";
         info.fileServerUrl = "test";
         info.repoName = "test";
         info.repoPubKey = Hex.toHexString(repoKeyPair.getPubKey());
@@ -272,14 +266,6 @@ public class ProjectInfoFile implements Serializable {
 
     public void setVersion(String version) {
         this.version = version;
-    }
-
-    public String getEthereumUrl() {
-        return ethereumUrl;
-    }
-
-    public void setEthereumUrl(String ethereumUrl) {
-        this.ethereumUrl = ethereumUrl;
     }
 
     public String getFileServerUrl() {

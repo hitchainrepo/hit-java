@@ -66,7 +66,6 @@ public class HitHelper {
     public static final String TYPE_account = "account";
     public static final String TYPE_rsa = "rsa";
     public static final String TYPE_storage = "storage";
-    public static final String TYPE_repository = "repository";
     public static final String TYPE_help = "help";
     public static final String TYPE_create = "create";
     public static final String TYPE_recover = "recover";
@@ -323,12 +322,6 @@ public class HitHelper {
                 storageAdd("main", "121.40.127.45");
             }
         }
-        {//init repository
-            Map<String, String> kv = getHitConfig().get(TYPE_repository);
-            if (kv == null) {
-                repositoryAdd("main", "https://121.40.127.45:1443");
-            }
-        }
         {//init chain
             Map<String, String> kv = getHitConfig().get(TYPE_chain);
             if (kv == null) {
@@ -537,50 +530,6 @@ public class HitHelper {
         }
         if (getByName(getHitConfig(), TYPE_storage, name) == null || !addByName(getHitConfig(), TYPE_storage, NAME_default, name, null)) {
             System.out.println("Can not find the storage " + name + " config!");
-            return false;
-        }
-        return true;
-    }
-
-    public static void repositoryInfo(String name) {
-        if (name == null) {
-            hitConfigInfo(TYPE_repository);
-            return;
-        }
-        Tuple.Two<String, String, String> two = getByName(getHitConfig(), TYPE_repository, name);
-        if (two == null) {
-            System.out.println("Can not find the repository name: " + name);
-            return;
-        }
-        System.out.println("The information by repository's name: " + name);
-        System.out.println("repository url :" + two.first());
-        System.out.println("default    name:" + two.result());
-    }
-
-    public static boolean repositoryAdd(String name, String url) {
-        if (!isValidName(name)) {
-            return false;
-        }
-        if (!isValidUrl(url)) {
-            return false;
-        }
-        addByName(getHitConfig(), TYPE_repository, name, url, null);
-        return true;
-    }
-
-    public static boolean repositoryRemove(String name) {
-        if (!isValidName(name)) {
-            return false;
-        }
-        return removeByName(getHitConfig(), TYPE_repository, name);
-    }
-
-    public static boolean repositorySet(String name) {
-        if (!isValidName(name)) {
-            return false;
-        }
-        if (getByName(getHitConfig(), TYPE_repository, name) == null || !addByName(getHitConfig(), TYPE_repository, NAME_default, name, null)) {
-            System.out.println("Can not find the repository " + name + " config!");
             return false;
         }
         return true;
@@ -866,11 +815,6 @@ public class HitHelper {
         return two == null ? null : two.first();
     }
 
-    public static String getRepository() {
-        Tuple.Two<String, String, String> two = getDefaultValue(TYPE_repository);
-        return two == null ? null : two.first();
-    }
-
     public static String getChain() {
         Tuple.Two<String, String, String> two = getDefaultValue(TYPE_chain);
         return two == null ? null : two.first();
@@ -993,7 +937,6 @@ public class HitHelper {
         PreRequiredHelper.requireNotBlank(getChainApi(), "Hit chainapi config not exists, add or set default chainapi first: hit cfg chainapi help");
         PreRequiredHelper.requireNotBlank(getContract(), "Hit contract config not exists, add or set default contract first: hit cfg contract help");
         PreRequiredHelper.requireNotBlank(getGas(), "Hit gas config not exists, add or set default gas first: hit cfg gas help");
-        PreRequiredHelper.requireNotBlank(getRepository(), "Hit repository config not exists, add or set default repository first: hit cfg repository help");
         PreRequiredHelper.requireNotBlank(getRsaPubKey(), "Hit rsa config not exists, add or set default repository first: hit cfg rsa help");
         PreRequiredHelper.requireNotBlank(getStorage(), "Hit storage config not exists, add or set default storage first: hit cfg storage help");
     }

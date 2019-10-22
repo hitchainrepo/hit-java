@@ -484,7 +484,6 @@ public class GitHelper {
                 ProjectInfoFile info = new ProjectInfoFile();
                 {
                     info.setVersion("1");
-                    info.setEthereumUrl(HitHelper.getRepository());
                     info.setFileServerUrl(HitHelper.getStorage());
                     String accountPubKey = HitHelper.getAccountPubKey();
                     Hit hit = new Hit(new FileRepository(gitDir), true);

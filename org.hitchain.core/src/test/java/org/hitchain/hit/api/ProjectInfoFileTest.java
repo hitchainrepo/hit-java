@@ -50,7 +50,6 @@ public class ProjectInfoFileTest {
         ProjectInfoFile info = new ProjectInfoFile();
         {
             info.setVersion("1");
-            info.setEthereumUrl("https://121.40.127.45:1443");
             info.setFileServerUrl("121.40.127.45");
             String accountPubKey = accountPub;
             String address = "0x48e154cb7040602163236df58a8cc3c0836425e1-6";
@@ -68,7 +67,6 @@ public class ProjectInfoFileTest {
     public void fromFile() throws Exception {
         ProjectInfoFile pif = ProjectInfoFile.fromFile(new HashedFile.FileWrapper("projectinfo", new HashedFile.ByteArrayInputStreamCallback(ByteHelper.utf8(PIF_CONTENT))));
         Assert.assertEquals("1", pif.getVersion());
-        Assert.assertEquals("https://121.40.127.45:1443", pif.getEthereumUrl());
         Assert.assertEquals("121.40.127.45", pif.getFileServerUrl());
         Assert.assertEquals("0x48e154cb7040602163236df58a8cc3c0836425e1-6", pif.getRepoAddress());
         Assert.assertEquals("spring-boot-seckill-20190829161143", pif.getRepoName());

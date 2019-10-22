@@ -144,29 +144,6 @@ public class HitConfigCommand implements Callable<Map<String, Map<String, String
         }
     }
 
-    public static class RepositoryCommand extends KeyValues<RepositoryCommand> implements ConfigCallable {
-        public RepositoryCommand add(String name, String url) {
-            return type(HitHelper.ACTION_add).name(name).value(url);
-        }
-
-        public Map<String, Map<String, String>> call() throws Exception {
-            if (HitHelper.ACTION_add.equals(type())) {
-                if (HitHelper.repositoryAdd(name(), value())) {
-                    return updateHitConfig();
-                }
-            } else if (HitHelper.ACTION_remove.equals(type())) {
-                if (HitHelper.repositoryRemove(name())) {
-                    return updateHitConfig();
-                }
-            } else if (HitHelper.ACTION_set.equals(type())) {
-                if (HitHelper.repositorySet(name())) {
-                    return updateHitConfig();
-                }
-            }
-            return null;
-        }
-    }
-
     public static class ChainCommand extends KeyValues<ChainCommand> implements ConfigCallable {
         public ChainCommand add(String name, String url) {
             return type(HitHelper.ACTION_add).name(name).value(url);

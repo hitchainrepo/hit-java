@@ -73,7 +73,6 @@ public class Main {
             "hit cfg account    add name [priKey]\n" +
             "hit cfg rsa        add name [priKey pubKey]\n" +
             "hit cfg storage    add name url\n" +
-            "hit cfg repository add name url\n" +
             "hit cfg chain      add name url(https://ropsten.infura.io, https://mainnet.infura.io/0x7995ab36bB307Afa6A683C24a25d90Dc1Ea83566)\n" +
             "hit cfg chainapi   add name url(http://api-ropsten.etherscan.io/api, https://api.etherscan.io/api)\n" +
             "hit cfg gas        add name deployGas deployGwei writeGas writeGwei\n" +
@@ -248,22 +247,6 @@ public class Main {
                     return;
                 }
                 HitHelper.storageInfo(name);
-                return;
-            }
-            if (HitHelper.TYPE_repository.equals(type)) {
-                if (HitHelper.ACTION_add.equals(operation)) {
-                    Hit.hitConfig().cmd(new HitConfigCommand.RepositoryCommand().add(name, p1)).call();
-                    return;
-                }
-                if (HitHelper.ACTION_remove.equals(operation)) {
-                    Hit.hitConfig().cmd(new HitConfigCommand.RepositoryCommand().remove(name)).call();
-                    return;
-                }
-                if (HitHelper.ACTION_set.equals(operation)) {
-                    Hit.hitConfig().cmd(new HitConfigCommand.RepositoryCommand().set(name)).call();
-                    return;
-                }
-                HitHelper.repositoryInfo(name);
                 return;
             }
             if (HitHelper.TYPE_recover.equals(type)) {
