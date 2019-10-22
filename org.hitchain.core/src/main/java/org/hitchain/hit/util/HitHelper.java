@@ -21,6 +21,7 @@ import org.iff.infra.util.SocketHelper;
 
 import java.io.*;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -319,7 +320,7 @@ public class HitHelper {
         {//init storage
             Map<String, String> kv = getHitConfig().get(TYPE_storage);
             if (kv == null) {
-                storageAdd("main", "121.40.127.45");
+                storageAdd("main", "http://121.40.127.45:5001/api/v0/,http://121.40.127.45:8080/ipfs/");
             }
         }
         {//init chain
@@ -513,7 +514,17 @@ public class HitHelper {
         if (!isValidUrl(url)) {
             return false;
         }
-        addByName(getHitConfig(), TYPE_storage, name, url, null);
+        String[] split = StringUtils.split(url, ",");
+        if (split.length != 2) {
+            return false;
+        }
+        if (!split[0].endsWith("/")) {
+            split[0] += "/";
+        }
+        if (!split[1].endsWith("/")) {
+            split[1] += "/";
+        }
+        addByName(getHitConfig(), TYPE_storage, name, StringUtils.join(split, ","), null);
         return true;
     }
 
@@ -815,6 +826,34 @@ public class HitHelper {
         return two == null ? null : two.first();
     }
 
+    public static URL getStoragePersistentUrl() {
+        String url = getStorage();
+        String[] split = StringUtils.split(url, ",");
+        if (split.length > 0) {
+            try {
+                if (!split[0].endsWith("/")) {
+                    split[0] += "/";
+                }
+                return new URL(split[0]);
+            } catch (MalformedURLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return null;
+    }
+
+    public static String getStorageViewUrl() {
+        String url = getStorage();
+        String[] split = StringUtils.split(url, ",");
+        if (split.length > 1) {
+            if (!split[1].endsWith("/")) {
+                split[1] += "/";
+            }
+            return split[1];
+        }
+        return null;
+    }
+
     public static String getChain() {
         Tuple.Two<String, String, String> two = getDefaultValue(TYPE_chain);
         return two == null ? null : two.first();
@@ -938,7 +977,8 @@ public class HitHelper {
         PreRequiredHelper.requireNotBlank(getContract(), "Hit contract config not exists, add or set default contract first: hit cfg contract help");
         PreRequiredHelper.requireNotBlank(getGas(), "Hit gas config not exists, add or set default gas first: hit cfg gas help");
         PreRequiredHelper.requireNotBlank(getRsaPubKey(), "Hit rsa config not exists, add or set default repository first: hit cfg rsa help");
-        PreRequiredHelper.requireNotBlank(getStorage(), "Hit storage config not exists, add or set default storage first: hit cfg storage help");
+        PreRequiredHelper.requireNotNull(getStoragePersistentUrl(), "Hit storage config not exists, add or set default storage first: hit cfg storage help");
+        PreRequiredHelper.requireNotBlank(getStorageViewUrl(), "Hit storage config not exists, add or set default storage first: hit cfg storage help");
     }
 
     public static String readPassword() {
@@ -1156,7 +1196,7 @@ public class HitHelper {
             }
             System.out.println(patch.patch());
             String pullRequestHash = GitHelper.writeFileToIpfs(ByteHelper.utf8(patch.patch()), "pullRequest.patch");
-            System.out.println("PullRequest: http://" + HitHelper.getStorage() + ":8080/ipfs/" + pullRequestHash);
+            System.out.println("PullRequest: " + HitHelper.getStorageViewUrl() + pullRequestHash);
             two = new Tuple.Two<>(pullRequestHash, patch);
         }
         // push repository
@@ -1195,7 +1235,7 @@ public class HitHelper {
         }
         for (Tuple.Two<Object, String, PatchHelper.PatchSummaryInfo> two : twos) {
             Map<String, Object> format = PatchHelper.format(two.second(), url, author, getAccountAddress(), getRsaPubKey());
-            format.put("patch_url", "http://" + HitHelper.getStorage() + ":8080/ipfs/" + two.first());
+            format.put("patch_url", HitHelper.getStorageViewUrl() + two.first());
             format.put("patch_hash", two.first());
             infos.add(format);
         }
@@ -1204,7 +1244,7 @@ public class HitHelper {
         {// upload pull request info
             System.out.println(prInfo);
             prInfoHash = GitHelper.writeFileToIpfs(ByteHelper.utf8(prInfo), "pullRequestInfo.json");
-            System.out.println("PullRequestInfo: http://" + HitHelper.getStorage() + ":8080/ipfs/" + prInfoHash);
+            System.out.println("PullRequestInfo: " + HitHelper.getStorageViewUrl() + prInfoHash);
         }
         return prInfoHash;
     }

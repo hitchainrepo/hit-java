@@ -169,7 +169,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                 }
                 for (PatchHelper.PatchSummaryInfo psi : summaryInfos) {
                     Map<String, Object> format = PatchHelper.format(psi, url, author, HitHelper.getAccountAddress(), HitHelper.getRsaPubKey());
-                    format.put("patch_url", "http://" + HitHelper.getStorage() + ":8080/ipfs/" + map.get(format.get("id")));
+                    format.put("patch_url", HitHelper.getStorageViewUrl() + map.get(format.get("id")));
                     format.put("patch_hash", map.get(format.get("id")));
                     summaries.add(format);
                 }
@@ -177,7 +177,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                 String prInfoHash = null;
                 {// upload pull request info
                     prInfoHash = GitHelper.writeFileToIpfs(ByteHelper.utf8(prInfo), "pullRequestInfo.json");
-                    System.out.println("PullRequestInfo: http://" + HitHelper.getStorage() + ":8080/ipfs/" + prInfoHash);
+                    System.out.println("PullRequestInfo: " + HitHelper.getStorageViewUrl() + prInfoHash);
                     String result = hit().contract().addPullRequest(prInfoHash);
                     //String writeAddPullRequest = PullRequestContractEthereumService.getApi().writeAddPullRequest(prInfoHash, getAccountPriKeyWithPasswordInput(), contractAddress, getGasWrite(), getGasWriteGwei());
                     if (ContractApi.isError(result)) {

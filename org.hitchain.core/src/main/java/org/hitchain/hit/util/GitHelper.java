@@ -32,6 +32,8 @@ import org.hitchain.hit.api.ProjectInfoFile;
 import org.hitchain.hit.util.Tuple.Two;
 
 import java.io.*;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.zip.GZIPInputStream;
@@ -111,7 +113,7 @@ public class GitHelper {
             throw new RuntimeException(e);
         }
         System.out.println("Repository information: directory=" + gitDir.getPath() +
-                ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash +
+                ", index=" + HitHelper.getStorageViewUrl() + gitFileIndexHash +
                 ", address=https://ropsten.etherscan.io/address/" + StringUtils.substringBefore(projectInfoFile.getRepoAddress(), "-") +
                 ", repositoryId=" + StringUtils.substringAfter(projectInfoFile.getRepoAddress(), "-"));
     }
@@ -171,7 +173,7 @@ public class GitHelper {
         writeUpdateFile(new File(gitDir, HIT_PROJECT_INFO), ByteHelper.utf8(content));
         FileUtils.deleteQuietly(newProjectInfoFile);
         System.out.println("Repository information: directory=" + gitDir.getPath() +
-                ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash +
+                ", index=" + HitHelper.getStorageViewUrl() + gitFileIndexHash +
                 ", address=https://ropsten.etherscan.io/address/" + StringUtils.substringBefore(projectInfoFile.getRepoAddress(), "-") +
                 ", repositoryId=" + StringUtils.substringAfter(projectInfoFile.getRepoAddress(), "-"));
     }
@@ -215,7 +217,7 @@ public class GitHelper {
         writeUpdateFile(new File(gitDir, HIT_PROJECT_INFO), ByteHelper.utf8(content));
         FileUtils.deleteQuietly(newProjectInfoFile);
         System.out.println("Repository information: directory=" + gitDir.getPath() +
-                ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash +
+                ", index=" + HitHelper.getStorageViewUrl() + gitFileIndexHash +
                 ", address=https://ropsten.etherscan.io/address/" + StringUtils.substringBefore(projectInfoFile.getRepoAddress(), "-") +
                 ", repositoryId=" + StringUtils.substringAfter(projectInfoFile.getRepoAddress(), "-"));
         return true;
@@ -228,7 +230,7 @@ public class GitHelper {
         combine.putAll(upload);
         //#7.Write the new GitFileIndex to disk and ipfs.
         String gitFileIndexHash = writeGitFileIndexToIpfs(gitDir, combine);
-        System.out.println("Repository information local directory=" + gitDir.getPath() + ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
+        System.out.println("Repository information local directory=" + gitDir.getPath() + ", index=" + HitHelper.getStorageViewUrl() + gitFileIndexHash + ", address=https://ropsten.etherscan.io/address/" + projectInfoFile.getRepoAddress());
         //#8.Call contract and update project hash(GitFileIndex hash).
         try (Hit hit = new Hit(new FileRepository((gitDir)))) {
             String result = hit.contract().updateUrl(gitFileIndexHash);
@@ -248,7 +250,7 @@ public class GitHelper {
         //#7.Write the new GitFileIndex to disk and ipfs.
         String gitFileIndexHash = writeGitFileIndexToIpfs(gitDir, combine);
         System.out.println("Repository information: directory=" + gitDir.getPath() +
-                ", index=http://" + HitHelper.getStorage() + ":8080/ipfs/" + gitFileIndexHash +
+                ", index=" + HitHelper.getStorageViewUrl() + gitFileIndexHash +
                 ", address=https://ropsten.etherscan.io/address/" + StringUtils.substringBefore(projectInfoFile.getRepoAddress(), "-") +
                 ", repositoryId=" + StringUtils.substringAfter(projectInfoFile.getRepoAddress(), "-"));
     }
@@ -313,13 +315,19 @@ public class GitHelper {
     }
 
     public static IPFS getIpfs() {
-        String urlIpfs = HitHelper.getStorage();
-        IPFS ipfs = new IPFS(urlIpfs, 5001, "/api/v0/", false);
+        URL url = HitHelper.getStoragePersistentUrl();
+        IPFS ipfs = new IPFS(url.getHost(), url.getPort(), url.getPath(), "https".equalsIgnoreCase(url.getProtocol()));
         return ipfs;
     }
 
-    public static IPFS getIpfs(String ipfsUrl) {
-        IPFS ipfs = new IPFS(ipfsUrl, 5001, "/api/v0/", false);
+    public static IPFS getIpfs(String urlIpfs) {
+        URL url = null;
+        try {
+            url = new URL(urlIpfs);
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+        }
+        IPFS ipfs = new IPFS(url.getHost(), url.getPort(), url.getPath(), "https".equalsIgnoreCase(url.getProtocol()));
         return ipfs;
     }
 
@@ -484,7 +492,7 @@ public class GitHelper {
                 ProjectInfoFile info = new ProjectInfoFile();
                 {
                     info.setVersion("1");
-                    info.setFileServerUrl(HitHelper.getStorage());
+                    info.setFileServerUrl(HitHelper.getStoragePersistentUrl().toExternalForm());
                     String accountPubKey = HitHelper.getAccountPubKey();
                     Hit hit = new Hit(new FileRepository(gitDir), true);
                     String address = hit.storedConfig().getRepositoryAddress().call();
