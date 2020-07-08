@@ -61,4 +61,10 @@ public class MainTest {
                 "clone", "hit://0xbe8023ef17357028d271ea915100a44b19e726d1.git"
         });
     }
+    public static void gitClone2() throws Exception {
+        System.setProperty("user.dir", "/Users/Theodore-Ramsden/Desktop/temppath");
+        org.eclipse.jgit.pgm.Main.main(new String[]{
+                "clone", "hit://0xbe8023ef17357028d271ea915100a44b19e726d1.git"
+        });
+    }
 }
