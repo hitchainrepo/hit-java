@@ -288,7 +288,7 @@ public class MainTest {
     public static void gitClone2() throws Exception {
         System.setProperty("user.dir", "/Users/Theodore-Ramsden/Desktop/temppath");
         org.eclipse.jgit.pgm.Main.main(new String[]{
-                "clone", "hit://0xbe8023ef17357028d271ea915100a44b19e726d1.git"
+                "clone", "hit://0xd1c935d2b098b52346d6fd7ce713c2eeb09982f9-3.git"
         });
     }
 
