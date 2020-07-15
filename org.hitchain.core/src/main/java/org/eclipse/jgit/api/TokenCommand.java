@@ -61,8 +61,12 @@ public class TokenCommand implements Callable<String> {
             return token;
         }
         if (type().equals("request-test")) {
-            String transationHash = api.requestTestToken(account());
-            return transationHash;
+            try {
+                String transationHash = api.requestTestToken(account());
+                return transationHash;
+            } catch (Exception e) {
+                return "request token error:" + e.toString();
+            }
         }
         return null;
     }
