@@ -326,8 +326,8 @@ public class HitHelper {
         {//init chain
             Map<String, String> kv = getHitConfig().get(TYPE_chain);
             if (kv == null) {
-                chainAdd("test", "https://ropsten.infura.io");
-                chainAdd("main", "https://mainnet.infura.io/0x7995ab36bB307Afa6A683C24a25d90Dc1Ea83566");
+                chainAdd("test", "https://ropsten.infura.io/v3/c4bf69dfc42d40b5aadf56b4ce19d078");
+                chainAdd("main", "https://mainnet.infura.io/v3/c4bf69dfc42d40b5aadf56b4ce19d078");
             }
         }
         {//init chain api
