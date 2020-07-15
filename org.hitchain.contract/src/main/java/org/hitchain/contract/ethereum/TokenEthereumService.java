@@ -43,7 +43,7 @@ public class TokenEthereumService extends TokenService implements TokenEthereumA
      * @return
      */
     public static SSLContext createIgnoreVerifySSL() throws Exception {
-        SSLContext sc = SSLContext.getInstance("SSLv3");
+        SSLContext sc = SSLContext.getInstance("TLSv1.2");
 
         // 实现一个X509TrustManager接口，用于绕过验证，不用修改里面的方法
         X509TrustManager trustManager = new X509TrustManager() {
