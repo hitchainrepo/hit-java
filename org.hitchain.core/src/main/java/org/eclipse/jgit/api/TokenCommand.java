@@ -7,6 +7,7 @@
  ******************************************************************************/
 package org.eclipse.jgit.api;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hitchain.contract.api.TokenEthereumApi;
 import org.hitchain.contract.ethereum.TokenEthereumService;
 import org.web3j.utils.Convert;
@@ -49,7 +50,11 @@ public class TokenCommand implements Callable<String> {
         TokenEthereumApi api = TokenEthereumService.getApi();
         if (type().equals("eth")) {
             String token = api.readToken(account());
-            return Convert.fromWei(token, Convert.Unit.ETHER).toPlainString();
+            try {
+                return Convert.fromWei(StringUtils.defaultString(token, "0"), Convert.Unit.ETHER).toPlainString();
+            } catch (Exception e) {
+                return "0";
+            }
         }
         if (type().equals("hit")) {
             String token = api.readHitToken(account());
