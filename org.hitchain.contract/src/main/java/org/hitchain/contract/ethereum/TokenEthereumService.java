@@ -86,6 +86,7 @@ public class TokenEthereumService extends TokenService implements TokenEthereumA
                     connection.setRequestProperty("content-type", "application/rawdata");
                     connection.setRequestProperty("referer", "https://faucet.metamask.io/");
                     connection.setRequestProperty("authority", "faucet.metamask.io");
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3100.0 Safari/537.36");
                     connection.setRequestProperty("Content-Length", String.valueOf(content.length()));
                     connection.setConnectTimeout(30 * 1000);
                     connection.setReadTimeout(60 * 1000);
