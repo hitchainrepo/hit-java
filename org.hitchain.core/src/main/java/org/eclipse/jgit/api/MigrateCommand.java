@@ -75,6 +75,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
 
     @Override
     public Hit call() throws GitAPIException {
+        HitHelper.testIpfs();
         String repositoryName = StringUtils.isNotBlank(name()) ? name() : GitHelper.getRepositoryName(uri());
         if (StringUtils.isBlank(repositoryName)) {
             throw new RuntimeException("uri is invalid: " + uri());
@@ -216,6 +217,9 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
         // pull url sample: https://api.github.com/repos/ethereum/ethereumj/pulls
         String pullUrl = FCS.get("https://api.github.com/repos/{owner}/{repoName}/pulls?per_page=" + maxPrSize, owner, repoName).toString();
         String pullsJson = httpGet2(pullUrl, "Try fetch pull request for {times} times, url {url}.");
+        if(pullsJson==null){
+
+        }
         List<Map<String, Object>> pulls = GsonHelper.toJsonList(pullsJson);
         for (Map<String, Object> pull : pulls) {
             System.out.println("Fetching pull request:" + pull.get("url"));
@@ -568,7 +572,7 @@ public class MigrateCommand extends TransportCommand<MigrateCommand, Hit> {
                     connection.setInstanceFollowRedirects(true);
                     connection.setRequestProperty("Charset", "UTF-8");
                     connection.setRequestProperty("Accept", "*/*");
-                    connection.setRequestProperty("User-Agent", "hit/1.0.0");
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3100.0 Safari/537.36");
                     if (StringUtils.isNotBlank(token)) {
                         connection.setRequestProperty("Authorization", "token " + token);
                     }
