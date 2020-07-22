@@ -1157,6 +1157,7 @@ public class HitHelper {
     }
 
     public static String createPullRequestCmd(File gitDir, String startBranch, String endBranch, String comment) {
+        HitHelper.testIpfs();
         // setting system property for transport.
         System.setProperty("GIT_CMD", "pullRequest");
         // comment is required.
@@ -1336,5 +1337,41 @@ public class HitHelper {
             }
         }
         return content;
+    }
+
+    public static boolean testIpfs() {
+        try {
+            URL persistentUrl = getStoragePersistentUrl();
+            String s = persistentUrl.toExternalForm() + "/stats/bw";
+            HttpURLConnection connection = null;
+            String content = null;
+            try {
+                URL url = new URL(s);
+                {
+                    connection = (HttpURLConnection) url.openConnection();
+                    connection.setDoOutput(true);
+                    connection.setInstanceFollowRedirects(true);
+                    connection.setRequestMethod("GET");
+                    connection.setRequestProperty("charset", "UTF-8");
+                    connection.setRequestProperty("accept", "*/*");
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3100.0 Safari/537.36");
+                    connection.setConnectTimeout(30 * 1000);
+                    connection.setReadTimeout(60 * 1000);
+                    connection.connect();
+                }
+                //content = IOUtils.toString(connection.getInputStream(), "UTF-8");
+                return 200 == connection.getResponseCode();
+            } catch (Exception e) {
+            } finally {
+                try {
+                    connection.disconnect();
+                } catch (Exception e) {
+                }
+            }
+        } catch (Exception e) {
+            System.err.printf("IPFS is not available.");
+            throw new RuntimeException("IPFS is not available.");
+        }
+        return false;
     }
 }
