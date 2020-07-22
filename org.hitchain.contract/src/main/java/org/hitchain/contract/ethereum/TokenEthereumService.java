@@ -19,6 +19,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import java.io.DataOutputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.cert.CertificateException;
 
@@ -71,6 +72,31 @@ public class TokenEthereumService extends TokenService implements TokenEthereumA
         System.out.println("Please wait a while if has no error occurred, such as 60 seconds, and check the account.");
         String requestUrl = "https://faucet.metamask.io/";
         String content = address;
+        {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("https://faucet.ropsten.be/donate/" + address);
+                {
+                    connection = (HttpURLConnection) url.openConnection();
+                    connection.setDoOutput(true);
+                    connection.setInstanceFollowRedirects(true);
+                    connection.setRequestMethod("GET");
+                    connection.setRequestProperty("charset", "UTF-8");
+                    connection.setRequestProperty("accept", "*/*");
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3100.0 Safari/537.36");
+                    connection.setConnectTimeout(30 * 1000);
+                    connection.setReadTimeout(60 * 1000);
+                    connection.connect();
+                }
+                IOUtils.toString(connection.getInputStream(), "UTF-8");
+            } catch (Exception e) {
+            } finally {
+                try {
+                    connection.disconnect();
+                } catch (Exception e) {
+                }
+            }
+        }
         for (int i = 0; i < 5; i++) {
             HttpsURLConnection connection = null;
             DataOutputStream wr = null;
