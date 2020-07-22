@@ -51,6 +51,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.hitchain.core.HitIPFSStorage;
 import org.hitchain.hit.util.GitHelper;
+import org.hitchain.hit.util.HitHelper;
 import org.hitchain.hit.util.Tuple.Two;
 
 import java.io.File;
@@ -120,6 +121,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
      * {@inheritDoc}
      */
     public FetchConnection openFetch() throws TransportException {
+        HitHelper.testIpfs();
         HitIPFSDatabase c = new HitIPFSDatabase(hit);
         WalkFetchConnection r = new WalkFetchConnection(this, c);
         r.available(c.readAdvertisedRefs());
@@ -130,6 +132,7 @@ public class TransportHit extends HttpTransport implements WalkTransport {
      * {@inheritDoc}
      */
     public PushConnection openPush() throws TransportException {
+        HitHelper.testIpfs();
         HitIPFSDatabase c = new HitIPFSDatabase(hit);
         WalkPushConnection r = new WalkPushConnection(this, c);
         r.available(c.readAdvertisedRefs());
