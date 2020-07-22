@@ -340,7 +340,7 @@ public class HitHelper {
         {//init gas
             Map<String, String> kv = getHitConfig().get(TYPE_gas);
             if (kv == null) {
-                gasAdd("main", "5000000", "10", "500000", "10");
+                gasAdd("main", "5000000", "20", "500000", "20");
             }
         }
         return true;
