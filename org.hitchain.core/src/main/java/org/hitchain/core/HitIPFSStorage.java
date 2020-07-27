@@ -8,8 +8,8 @@
  ******************************************************************************/
 package org.hitchain.core;
 
-import io.ipfs.api.IPFS;
-import io.ipfs.api.MerkleNode;
+import org.hitchain.ipfs.IPFS;
+import org.hitchain.ipfs.MerkleNode;
 import io.ipfs.multihash.Multihash;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jgit.api.Hit;
