@@ -8,10 +8,10 @@
  ******************************************************************************/
 package org.hitchain.hit.api;
 
-import io.ipfs.api.NamedStreamable;
 import org.apache.commons.io.IOUtils;
 import org.hitchain.hit.util.ECCHelper;
 import org.hitchain.hit.util.GitHelper;
+import org.hitchain.ipfs.NamedStreamable;
 
 import java.io.*;
 import java.net.URLEncoder;
