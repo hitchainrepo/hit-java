@@ -8,9 +8,9 @@
  ******************************************************************************/
 package org.hitchain.hit.util;
 
-import io.ipfs.api.IPFS;
-import io.ipfs.api.MerkleNode;
-import io.ipfs.api.NamedStreamable;
+import org.hitchain.ipfs.IPFS;
+import org.hitchain.ipfs.MerkleNode;
+import org.hitchain.ipfs.NamedStreamable;
 import io.ipfs.multihash.Multihash;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;

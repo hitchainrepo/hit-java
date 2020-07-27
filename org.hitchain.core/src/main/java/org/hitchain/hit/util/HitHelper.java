@@ -14,6 +14,7 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.hitchain.contract.api.ContractApi;
 import org.hitchain.hit.api.ProjectInfoFile;
+import org.hitchain.ipfs.IPFS;
 import org.iff.infra.util.FCS;
 import org.iff.infra.util.NumberHelper;
 import org.iff.infra.util.PreRequiredHelper;
@@ -1341,32 +1342,10 @@ public class HitHelper {
 
     public static boolean testIpfs() {
         try {
-            URL persistentUrl = getStoragePersistentUrl();
-            String s = persistentUrl.toExternalForm() + "/stats/bw";
-            HttpURLConnection connection = null;
-            String content = null;
-            try {
-                URL url = new URL(s);
-                {
-                    connection = (HttpURLConnection) url.openConnection();
-                    connection.setDoOutput(true);
-                    connection.setInstanceFollowRedirects(true);
-                    connection.setRequestMethod("GET");
-                    connection.setRequestProperty("charset", "UTF-8");
-                    connection.setRequestProperty("accept", "*/*");
-                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3100.0 Safari/537.36");
-                    connection.setConnectTimeout(30 * 1000);
-                    connection.setReadTimeout(60 * 1000);
-                    connection.connect();
-                }
-                //content = IOUtils.toString(connection.getInputStream(), "UTF-8");
-                return 200 == connection.getResponseCode();
-            } catch (Exception e) {
-            } finally {
-                try {
-                    connection.disconnect();
-                } catch (Exception e) {
-                }
+            IPFS ipfs = GitHelper.getIpfs();
+            Map bw = ipfs.stats.bw();
+            if (bw == null) {
+                throw new RuntimeException("IPFS is not available.");
             }
         } catch (Exception e) {
             System.err.printf("IPFS is not available.");
