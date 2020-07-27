@@ -7,7 +7,7 @@
  ******************************************************************************/
 package org.eclipse.jgit.api;
 
-import io.ipfs.api.IPFS;
+import org.hitchain.ipfs.IPFS;
 import io.ipfs.multihash.Multihash;
 import org.apache.commons.lang3.StringUtils;
 import org.hitchain.contract.api.ContractApi;
