@@ -321,7 +321,7 @@ public class HitHelper {
         {//init storage
             Map<String, String> kv = getHitConfig().get(TYPE_storage);
             if (kv == null) {
-                storageAdd("main", "http://121.40.127.45:5001/api/v0/,http://121.40.127.45:8080/ipfs/");
+                storageAdd("main", "http://8.210.217.158:5001/api/v0/,http://8.210.217.158:80/ipfs/");
             }
         }
         {//init chain
@@ -341,7 +341,7 @@ public class HitHelper {
         {//init gas
             Map<String, String> kv = getHitConfig().get(TYPE_gas);
             if (kv == null) {
-                gasAdd("main", "5000000", "30", "500000", "30");
+                gasAdd("main", "5000000", "150", "500000", "150");
             }
         }
         return true;
